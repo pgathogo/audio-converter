@@ -1,0 +1,5 @@
+*.exe
+Audio/
+Output/
+DBF/
+__pycache__/
