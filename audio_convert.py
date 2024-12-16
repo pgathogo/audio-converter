@@ -111,6 +111,7 @@ class AudioConverter:
         total_conversion_time = 0.0
         total_converted_files = 0
         for i, record in enumerate(data):
+            print(f"record: {record}")
             # Get .MTS file count in the audio folder
             input_file = f"{self.audio_folder}/{dbf}/{record['audio_file']}"
 
