@@ -30,7 +30,7 @@ def get_raw_dbf_data(dbf: str) -> list:
 
 def format_raw_data(hex_data: list, dbf_name: str) -> list:
     # Remove "DBF/" and .DBF from dbf name
-    dbf_name = dbf_name[4:-4]
+    dbf_name = dbf_name[8:-4]
     category = dbf_name
 
     ascii_data = []
