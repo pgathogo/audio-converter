@@ -19,11 +19,13 @@ def get_raw_dbf_data(dbf: str) -> list:
             record['artist'] = dbf.read(ARTIST).hex()
             data.append(record)
 
-            dbf.read(NEXT_RECORD)
+            nr = dbf.read(NEXT_RECORD)
+
+            if not nr:
+                break
 
             rec_count += 1
-            if rec_count == 100:
-                break
+
     return data
 
 def format_raw_data(hex_data: list, dbf_name: str) -> list:

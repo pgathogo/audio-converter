@@ -15,6 +15,7 @@ class AudioConverter:
         self.output_folder = kwargs.get("output_folder", "output/")
         self.log_folder = kwargs.get("log_folder", "log/")
         self.artists_file = kwargs.get("artists_file", "artists.txt")
+        self.process_category = kwargs.get("process_category", "all")
 
         converted = kwargs.get("keep_converted", "False")
         if converted == "True":
@@ -58,6 +59,15 @@ class AudioConverter:
         dbf_files = [f for f in os.listdir(self.dbf_folder+"/") if f.endswith('.DBF')]
         print(f"{len(dbf_files)} files found")
 
+        if self.process_category != "all":
+            proc_cats = self.process_category.split(",")
+            pcats = [ cat.upper()+".DBF" for cat in proc_cats if cat.upper()+".DBF" in dbf_files ]
+
+            if len(pcats) == 0:
+                raise Exception(f"Invalid process category: {self.process_category}")
+
+            dbf_files = pcats
+
         for dbf in dbf_files:
             print(f"Reading data from: {dbf}")
             data = get_data(self.dbf_folder+"/"+dbf)
@@ -70,6 +80,7 @@ class AudioConverter:
 
         self.print_summary()
 
+    
     def print_summary(self):
         print(f"Total MTS files: {self.total_mts_files}")
         print(f"Total converted files: {self.total_converted_files}")
@@ -116,16 +127,18 @@ class AudioConverter:
             if not os.path.exists("ffmpeg.exe"):
                 raise Exception("ffmpeg is not installed")
 
-            output_file = f"{self.output_folder}/{dbf}{record['code']}.ogg"
+            output_file = f"{dbf}{record['code']}.ogg"
+            output_filepath = f"{self.output_folder}/{output_file}"
 
             if self.keep_converted:
-                if os.path.exists(output_file):
+                if os.path.exists(output_filepath):
                     continue
 
             # Get size in KB of input_file
-            size = os.path.getsize(input_file) / 1024
+            input_file_size_kb = os.path.getsize(input_file) / 1024
+            record["input_file_size_kb"] = input_file_size_kb
 
-            conversion_msg = f"{i+1}.Converting: {input_file} ({size:.2f} KB) => {output_file}"
+            conversion_msg = f"{i+1}.Converting: {input_file} ({input_file_size_kb:.2f} KB) => {output_filepath}"
             print(conversion_msg, end="\r")
             
             audio_converted = False
@@ -133,7 +146,7 @@ class AudioConverter:
             start_time = timer()
 
             try:
-                os.system(f"ffmpeg -y -i {input_file} -nostats -loglevel 0 -c:a libvorbis -q:a 4 -vsync 2 {output_file}")
+                os.system(f"ffmpeg -y -i {input_file} -nostats -loglevel 0 -c:a libvorbis -q:a 4 -vsync 2 {output_filepath}")
                 audio_converted = True
             except:
                 failed_conversions.append(record)
@@ -146,16 +159,21 @@ class AudioConverter:
             total_conversion_time += time_diff.total_seconds()
             total_converted_files += 1
 
+            # Get size in KB of input_file
+            output_file_size_kb = os.path.getsize(output_filepath) / 1024
+
             record["conversion_time"] = time_diff.total_seconds()
+            record["converted_filename"] = output_file
+            record["output_file_size_kb"] = output_file_size_kb
 
             duration = 0
             if audio_converted:
                 try:
-                    duration = self.probe_audio_duration(output_file)
+                    duration = self.probe_audio_duration(output_filepath)
                 except:
                     failed_probes.append(record)
 
-            record["duration"] = duration * 1000 # milliseconds
+            record["duration_ms"] = duration * 1000 # milliseconds
             converted_files.append(record)
 
             # check if the record 'artist' is in the artists dictionary if not add it
@@ -163,6 +181,8 @@ class AudioConverter:
                 self.artists[record['artist']] = len(self.artists)
 
         print(f"Total Files Converted: {total_converted_files}")
+
+        print(f"Total Missing Files: {len(missing_files)}")
 
         # Print total conversion time as "hh:mm:ss" format
         total_time = timedelta(seconds=total_conversion_time)
@@ -181,7 +201,9 @@ class AudioConverter:
                 "dbf_file":dbf+".DBF",
                 "dbf_records":len(data),
                 "audio_files":len(mts_files),
+                "output_folder":self.output_folder,
                 "converted_files_count":len(converted_files),
+                "missing_files_count":len(missing_files),
                 "converted_files":converted_files,
                 "total_conversion_time":(dt0+total_time).strftime('%H:%M:%S'), 
                 "average_conversion_time":(dt0+average_conversion_time).strftime('%H:%M:%S'),
