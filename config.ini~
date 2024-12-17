@@ -1,7 +1,7 @@
-dbf_folder=../DBF
-audio_folder=../Audio
-output_foler=../Output
-log_folder=../logs
-artists_file=../logs/artists.txt
+dbf_folder=..//DBF
+audio_folder=..//Audio
+output_folder=..//Output
+log_folder=..//logs
+artists_file=..//logs//artists.txt
 keep_converted=False
-process_category=chr
+process_category=com

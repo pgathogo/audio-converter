@@ -68,9 +68,12 @@ class AudioConverter:
 
             dbf_files = pcats
 
+        print(pcats)
         for dbf in dbf_files:
             print(f"Reading data from: {dbf}")
             data = get_data(self.dbf_folder+"/"+dbf)
+
+            break
 
             print(f"{len(data)} records found")
             self.write_data(data, dbf)
@@ -106,7 +109,12 @@ class AudioConverter:
 
         dbf = dbf[:-4]
 
-        mts_files = [f for f in os.listdir(self.audio_folder+"/"+dbf+"/") if f.endswith('.MTS')]
+        dbf_folder = f"{self.audio_folder}/{dbf}/"
+        if not os.path.exists(dbf_folder):
+            print(f"Missing audio folder: {dbf_folder}")
+            return
+
+        mts_files = [f for f in os.listdir(dbf_folder) if f.endswith('.MTS')]
 
         total_conversion_time = 0.0
         total_converted_files = 0
