@@ -73,9 +73,11 @@ class AudioConverter:
             print(f"Reading data from: {dbf}")
             data = get_data(self.dbf_folder+"/"+dbf)
 
-            break
+            if len(data) == 0:
+                continue
 
             print(f"{len(data)} records found")
+
             self.write_data(data, dbf)
 
             print(f"Converting audio files to ogg")
