@@ -16,6 +16,7 @@ class AudioConverter:
         self.log_folder = kwargs.get("log_folder", "log/")
         self.artists_file = kwargs.get("artists_file", "artists.txt")
         self.process_category = kwargs.get("process_category", "all")
+        self.exclude_dbfs = kwargs.get("exclude_dbfs", "")
 
         converted = kwargs.get("keep_converted", "False")
         if converted == "True":
@@ -54,7 +55,7 @@ class AudioConverter:
 
     def convert(self):
         # Loop through a folder and read all files with extension .dbf
-        print(f"Reading data from: {self.dbf_folder}")
+        print(f"Reading data from:...... {self.dbf_folder}")
 
         dbf_files = [f for f in os.listdir(self.dbf_folder+"/") if f.endswith('.DBF')]
         print(f"{len(dbf_files)} files found")
@@ -68,9 +69,17 @@ class AudioConverter:
 
             dbf_files = pcats
 
-        print(pcats)
+        exclude_dbfs = self.exclude_dbfs.split(",")
+        # Capitialize all elements in exclude_dbfs
+        exclude_dbfs = [dbf.upper()+".DBF" for dbf in exclude_dbfs]
+
         for dbf in dbf_files:
-            print(f"Reading data from: {dbf}")
+
+            if dbf in exclude_dbfs:
+                print(f"Excluding:....... {dbf}")
+                continue
+
+            print(f"Reading data from:....... {dbf}")
             data = get_data(self.dbf_folder+"/"+dbf)
 
             if len(data) == 0:
@@ -87,12 +96,12 @@ class AudioConverter:
 
     
     def print_summary(self):
-        print(f"Total MTS files: {self.total_mts_files}")
-        print(f"Total converted files: {self.total_converted_files}")
-        print(f"Total failed conversions: {self.total_failed_conversions}")
-        print(f"Total failed probes: {self.total_failed_probes}")
-        print(f"Total missing files: {self.total_missing_files}")
-        print(f"Total conversion time: {self.total_conversion_time_str}")
+        print(f"Total MTS files:...... {self.total_mts_files}")
+        print(f"Total converted files:...... {self.total_converted_files}")
+        print(f"Total failed conversions:...... {self.total_failed_conversions}")
+        print(f"Total failed probes:...... {self.total_failed_probes}")
+        print(f"Total missing files:...... {self.total_missing_files}")
+        print(f"Total conversion time:...... {self.total_conversion_time_str}")
 
     def write_data(self, data: list, dbf: str):
         # Write data to a json file, remoce extension .DBF
@@ -192,20 +201,20 @@ class AudioConverter:
             if record['artist'] not in self.artists:
                 self.artists[record['artist']] = len(self.artists)
 
-        print(f"Total Files Converted: {total_converted_files}")
+        print(f"Total Files Converted:.... {total_converted_files}")
 
-        print(f"Total Missing Files: {len(missing_files)}")
+        print(f"Total Missing Files:.... {len(missing_files)}")
 
         # Print total conversion time as "hh:mm:ss" format
         total_time = timedelta(seconds=total_conversion_time)
-        print(f"Total conversion time: {total_time}")
+        print(f"Total conversion time:.... {total_time}")
 
         # Get average conversion time in seconds
         average_conversion_time = total_conversion_time / total_converted_files
 
         # Print average conversion time as "hh:mm:ss" format
         average_conversion_time = timedelta(seconds=average_conversion_time)
-        print(f"Average conversion time: {average_conversion_time}")
+        print(f"Average conversion time:.... {average_conversion_time}")
 
         dt0 = datetime.datetime(1,1,1)
 
