@@ -1,8 +1,4 @@
 import sys
-from importlib import reload
-reload(sys)
-sys.setdefaultencoding('utf-8')
-
 import json
 
 def get_raw_dbf_data(dbf: str) -> list:
@@ -41,14 +37,23 @@ def format_raw_data(hex_data: list, dbf_name: str) -> list:
     ascii_data = []
     for i, data in enumerate(hex_data):
         record = {}
-        code_byte_string = bytes.fromhex(data['code'])
-        record['code'] = code_byte_string.decode('ASCII')
+        try:
+            code_byte_string = bytes.fromhex(data['code'])
+            record['code'] = code_byte_string.decode('ASCII')
+        except:
+            record['code'] = ''
 
-        title_byte_string = bytes.fromhex(data['title'])
-        record['title'] = title_byte_string.decode('ASCII').rstrip()
+        try:
+            title_byte_string = bytes.fromhex(data['title'])
+            record['title'] = title_byte_string.decode('ASCII').rstrip()
+        except:
+            record['title'] = ''
 
-        art_byte_string = bytes.fromhex(data['artist'])
-        record['artist'] = art_byte_string.decode('ASCII').rstrip()
+        try:
+            art_byte_string = bytes.fromhex(data['artist'])
+            record['artist'] = art_byte_string.decode('ASCII').rstrip()
+        except:
+            record['artist'] = ''
 
         record['category'] = category
 
