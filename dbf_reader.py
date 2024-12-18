@@ -1,3 +1,6 @@
+import sys
+from importlib import reload
+
 import json
 
 def get_raw_dbf_data(dbf: str) -> list:
@@ -29,6 +32,8 @@ def get_raw_dbf_data(dbf: str) -> list:
     return data
 
 def format_raw_data(hex_data: list, dbf_name: str) -> list:
+    reload(sys)
+    sys.setDefaultEncoding('utf-8')
     # Remove "DBF/" and .DBF from dbf name
     dbf_name = dbf_name[8:-4]
     category = dbf_name
