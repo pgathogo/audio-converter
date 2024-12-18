@@ -214,11 +214,14 @@ class AudioConverter:
         total_time = timedelta(seconds=total_conversion_time)
         print(f"Category conversion time.........: {total_time}")
 
-        # Get average conversion time in seconds
-        average_conversion_time = total_conversion_time / total_converted_files
+        average_conversion_time = 0
+        if total_converted_files > 0:
+            # Get average conversion time in seconds
+            average_conversion_time = total_conversion_time / total_converted_files
 
-        # Print average conversion time as "hh:mm:ss" format
-        average_conversion_time = timedelta(seconds=average_conversion_time)
+            # Print average conversion time as "hh:mm:ss" format
+            average_conversion_time = timedelta(seconds=average_conversion_time)
+
         print(f"Average conversion time..........: {average_conversion_time}")
 
         print("................................................")
