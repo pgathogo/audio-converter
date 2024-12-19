@@ -33,6 +33,7 @@ class AudioConverter:
         self.total_missing_files = 0
         self.total_conversion_time = 0
         self.total_conversion_time_str = ""
+        self.total_zero_bytes_files = 0
 
     def fetch_artists(self, file) ->dict[int, str]:
         # Check if the file exists
@@ -104,6 +105,7 @@ class AudioConverter:
         print(f"Total failed conversions......: {self.total_failed_conversions}")
         print(f"Total failed probes...........: {self.total_failed_probes}")
         print(f"Total missing files...........: {self.total_missing_files}")
+        print(f"Total zero bytes files........: {self.total_zero_bytes_files}")
         print(f"Total conversion time.........: {self.total_conversion_time_str}")
 
     def write_data(self, data: list, dbf: str):
@@ -120,6 +122,7 @@ class AudioConverter:
         conversion_log = []
         failed_conversions = []
         failed_probes = []
+        zero_bytes_files = []
 
         dbf = dbf[:-4]
 
@@ -141,7 +144,21 @@ class AudioConverter:
             # Check if audio file exists
             if not os.path.exists(f"{input_file}"):
                 missing_files.append(record)
+                print(f"Missing audio file: {input_file}  ... skipping")
                 continue
+
+            # Get size in KB of input_file
+            input_file_size_kb = os.path.getsize(input_file) / 1024
+            if input_file_size_kb == 0:
+                zero_bytes_files.append(record)
+                print(f"Zero bytes file: {input_file}  ... skipping")
+                continue
+
+            record["input_file_size_kb"] = input_file_size_kb
+
+            if self.keep_converted:
+                if os.path.exists(output_filepath):
+                    continue
 
             # Check if output folder exists
             if not os.path.exists(self.output_folder):
@@ -153,14 +170,6 @@ class AudioConverter:
 
             output_file = f"{dbf}{record['code']}.ogg"
             output_filepath = f"{self.output_folder}/{output_file}"
-
-            if self.keep_converted:
-                if os.path.exists(output_filepath):
-                    continue
-
-            # Get size in KB of input_file
-            input_file_size_kb = os.path.getsize(input_file) / 1024
-            record["input_file_size_kb"] = input_file_size_kb
 
             conversion_msg = f"{i+1}.Converting: {input_file} ({input_file_size_kb:.2f} KB) => {output_filepath}"
             print(conversion_msg, end="\r")
@@ -210,6 +219,8 @@ class AudioConverter:
 
         print(f"Category Missing Files...........: {len(missing_files)}")
 
+        print(f"Category Zero Byte Files.........: {len(zero_bytes_files)}")
+
         # Print total conversion time as "hh:mm:ss" format
         total_time = timedelta(seconds=total_conversion_time)
         print(f"Category conversion time.........: {total_time}")
@@ -235,8 +246,10 @@ class AudioConverter:
                 "audio_files":len(mts_files),
                 "output_folder":self.output_folder,
                 "converted_files_count":len(converted_files),
-                "missing_files_count":len(missing_files),
                 "converted_files":converted_files,
+                "missing_files_count":len(missing_files),
+                "zero_bytes_files_count":len(zero_bytes_files),
+                "zero_bytes_files":zero_bytes_files,
                 "total_conversion_time":(dt0+total_time).strftime('%H:%M:%S'), 
                 "average_conversion_time":(dt0+average_conversion_time).strftime('%H:%M:%S'),
                 "failed_conversions":failed_conversions,
@@ -249,6 +262,7 @@ class AudioConverter:
         self.total_failed_conversions += len(failed_conversions)
         self.total_failed_probes += len(failed_probes)
         self.total_missing_files += len(missing_files)
+        self.total_zero_bytes_files += len(zero_bytes_files)
         self.total_conversion_time += total_time.total_seconds()
         self.total_conversion_time_str = (dt0+timedelta(seconds=self.total_conversion_time)).strftime('%H:%M:%S')
 
@@ -263,6 +277,11 @@ class AudioConverter:
         # Remove extension .DBF
         with open(f"{self.log_folder}/{dbf}_missing.json", "w") as f:
             json.dump(missing_files, f, indent=4)
+
+        # Write zero byte files to a json file
+        # Remove extension .DBF
+        with open(f"{self.log_folder}/{dbf}_zero_bytes.json", "w") as f:
+            json.dump(zero_bytes_files, f, indent=4)
 
         # Write conversion log to a json file
         with open(f"{self.log_folder}/{dbf}_conversion_log.json", "w") as f:
