@@ -99,21 +99,6 @@ class AudioConverter:
         self.print_summary()
 
     
-    def print_summary(self):
-        print(f"Total MTS files...............: {self.total_mts_files}")
-        print(f"Total converted files.........: {self.total_converted_files}")
-        print(f"Total failed conversions......: {self.total_failed_conversions}")
-        print(f"Total failed probes...........: {self.total_failed_probes}")
-        print(f"Total missing files...........: {self.total_missing_files}")
-        print(f"Total zero bytes files........: {self.total_zero_bytes_files}")
-        print(f"Total conversion time.........: {self.total_conversion_time_str}")
-
-    def write_data(self, data: list, dbf: str):
-        # Write data to a json file, remoce extension .DBF
-        dbf = dbf[:-4]
-        print(f"Writing data to: {self.dbf_folder}/{dbf}.json")
-        with open(f"{self.dbf_folder}/{dbf}.json", "w") as f:
-            json.dump(data, f, indent=4)
 
     def convert_audio(self, data: list, dbf: str):
         # Convert audio files from MTS to ogg
@@ -147,8 +132,16 @@ class AudioConverter:
                 print(f"Missing audio file: {input_file}  ... skipping")
                 continue
 
-            # Get size in KB of input_file
-            input_file_size_kb = os.path.getsize(input_file) / 1024
+            file_in_bytes = 0
+            try:
+                # Get size in KB of input_file
+                file_in_bytes = os.path.getsize(input_file)
+            except OSError as e:
+                print(f"Failed to get size of {input_file}: {e}")
+                continue
+
+            input_file_size_kb = file_in_bytes / 1024
+
             if input_file_size_kb == 0:
                 zero_bytes_files.append(record)
                 print(f"Zero bytes file: {input_file}  ... skipping")
@@ -296,3 +289,19 @@ class AudioConverter:
         # Get audio duration in seconds
         result = run(["ffprobe", "-v", "quiet", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", audio_file], stdout=PIPE, stderr=PIPE)
         return float(result.stdout.decode("utf-8"))
+
+    def print_summary(self):
+        print(f"Total MTS files...............: {self.total_mts_files}")
+        print(f"Total converted files.........: {self.total_converted_files}")
+        print(f"Total failed conversions......: {self.total_failed_conversions}")
+        print(f"Total failed probes...........: {self.total_failed_probes}")
+        print(f"Total missing files...........: {self.total_missing_files}")
+        print(f"Total zero bytes files........: {self.total_zero_bytes_files}")
+        print(f"Total conversion time.........: {self.total_conversion_time_str}")
+
+    def write_data(self, data: list, dbf: str):
+        # Write data to a json file, remoce extension .DBF
+        dbf = dbf[:-4]
+        print(f"Writing data to: {self.dbf_folder}/{dbf}.json")
+        with open(f"{self.dbf_folder}/{dbf}.json", "w") as f:
+            json.dump(data, f, indent=4)
