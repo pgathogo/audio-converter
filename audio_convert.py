@@ -149,20 +149,21 @@ class AudioConverter:
 
             record["input_file_size_kb"] = input_file_size_kb
 
-            if self.keep_converted:
-                if os.path.exists(output_filepath):
-                    continue
-
             # Check if output folder exists
             if not os.path.exists(self.output_folder):
                 os.makedirs(self.output_folder)
 
+            output_file = f"{dbf}{record['code']}.ogg"
+            output_filepath = f"{self.output_folder}/{output_file}"
+
+            if self.keep_converted:
+                if os.path.exists(output_filepath):
+                    print(f"Output file already exists: {output_filepath}  ... skipping")
+                    continue
+
             # Check if ffmpeg is installed
             if not os.path.exists("ffmpeg.exe"):
                 raise Exception("ffmpeg is not installed")
-
-            output_file = f"{dbf}{record['code']}.ogg"
-            output_filepath = f"{self.output_folder}/{output_file}"
 
             conversion_msg = f"{i+1}.Converting: {input_file} ({input_file_size_kb:.2f} KB) => {output_filepath}"
             print(conversion_msg, end="\r")
