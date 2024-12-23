@@ -126,15 +126,15 @@ class AudioConverter:
     def make_sql_import_stmts(self, tracks:list)-> list:
         stmts = []
         for track in tracks:
-            ins_stmt = (f"Insert into Tracks (tracktitle,artistsearch,filepath,class,duration,year,"
-                        f"fadein,fadeout,fadedelay,intro,extro,folderid,onstartevent,onstopevent,"
-                        f"disablenotify,physicalstorageused,trackmediatype,artistID_1, old_filename)"
-                        f" VALUES ( "
-                        f"'{track['tracktitle']}','{track['artistsearch']}','{track['filepath']}', "
-                        f"'{track['class']}',{track['duration']},{track['year']},{track['fadein']},{track['fadeout']},"
-                        f"{track['fadedelay']},{track['intro']},{track['extro']},{track['folderid']},"
-                        f"{track['onstartevent']},{track['onstopevent']},{track['disablenotify']},"
-                        f"{track['physicalstorageused']},'{track['trackmediatype']}',{track['artistID_1']},'{track['old_filename']}' );")
+            ins_stmt = (f'Insert into Tracks (tracktitle,artistsearch,filepath,class,duration,year,'
+                        f'fadein,fadeout,fadedelay,intro,extro,folderid,onstartevent,onstopevent,'
+                        f'disablenotify,physicalstorageused,trackmediatype,artistID_1, eld_filename)'
+                        f' VALUES ( '
+                        f'"{track["tracktitle"]}","{track["artistsearch"]}","{track["filepath"]}", '
+                        f'"{track["class"]}",{track["duration"]},{track["year"]},{track["fadein"]},{track["fadeout"]},'
+                        f'{track["fadedelay"]},{track["intro"]},{track["extro"]},{track["folderid"]},'
+                        f'{track["onstartevent"]},{track["onstopevent"]},{track["disablenotify"]},'
+                        f'{track["physicalstorageused"]},"{track["trackmediatype"]}",{track["artistID_1"]},"{track["old_filename"]}" );')
 
             stmts.append(ins_stmt)
 
