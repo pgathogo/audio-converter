@@ -111,7 +111,12 @@ class AudioConverter:
             track['disablenotify'] = 0
             track['physicalstorageused'] = record['converted_file_size_kb'] * 1024
             track['trackmediatype'] = 'AUDIO'
-            track['artistID_1'] = self.artists[record['artist']]
+
+            if record['artist'] not in self.artists.keys():
+                track['artistID_1'] = 0
+            else:
+                track['artistID_1'] = self.artists[record['artist']]
+
             track['old_filename'] = record['converted_filename']
 
             tracks.append(track)
