@@ -17,6 +17,7 @@ class AudioConverter:
         self.artists_file = kwargs.get("artists_file", "artists.txt")
         self.process_category = kwargs.get("process_category", "all")
         self.exclude_dbfs = kwargs.get("exclude_dbfs", "")
+        self.sql_folder = kwargs.get("sql_folder", "sql/")
 
         converted = kwargs.get("keep_converted", "False")
         if converted == "True":
@@ -24,7 +25,7 @@ class AudioConverter:
         else:
             self.keep_converted = False
 
-        self.artists = self.fetch_artists("logs/artists.txt")
+        self.artists = self.fetch_data(self.artists_file)
 
         self.total_mts_files = 0
         self.total_converted_files = 0
@@ -40,6 +41,7 @@ class AudioConverter:
         if not os.path.exists(file):
             return {}
 
+
         # Read artists from a file with the following format : id, name
         with open(file, "r") as f:
             data = f.read().split("\n")
@@ -53,6 +55,110 @@ class AudioConverter:
         # Get max id for the artists
         max_id = max(artists.values())
         return artists
+
+    def fetch_data(self, file:str) ->dict[int, str]:
+        # Check if the file exists
+        if not os.path.exists(file):
+            return {}
+
+        # Read artists from a file with the following format : id, name
+        with open(file, "r") as f:
+            records = f.read().split("\n")
+            data = {}
+            for record in records:
+                if record == "":
+                    continue
+                id, name = record.split(",")
+                data[name] = int(id)
+        return data
+
+    def process_import_data(self):
+        tree = self.fetch_data("..//input//treeimportdata")
+        for name, id in tree.items():
+            tracks = self.prepare_tracks_import_data(name, id)
+            if len(tracks) > 0:
+                stmts =self.make_sql_import_stmts(tracks)
+                # Write data to a json file
+                self.write_sql_stmts(stmts, name)
+
+    def prepare_tracks_import_data(self, tree_name:str, tree_id:int) -> list:
+        tracks = []
+
+        converted_json_file = f"{self.log_folder}/{tree_name}_converted.json"
+        if not os.path.exists(converted_json_file):
+            return tracks
+
+        # Load converted json file
+        with open(converted_json_file, "r") as f:
+            converted_data = json.load(f)
+
+        for record in converted_data:
+            track = {}
+            track['tracktitle'] = record['title']
+            track['artistsearch'] = record['artist']
+            track['filepath'] = "//INOOROFM/AUDIO/"
+            track['class'] = 'SONG'
+            track['duration'] = record['duration_ms']
+            track['year'] = 2020
+            track['fadein'] = 0 
+            track['fadeout'] = 0
+            track['fadedelay'] = 0
+            track['intro'] = 0
+            track['extro'] = 0
+            track['folderid'] = tree_id
+            track['onstartevent'] = -1
+            track['onstopevent'] = -1
+            track['disablenotify'] = 0
+            track['physicalstorageused'] = record['converted_file_size_kb'] * 1024
+            track['trackmediatype'] = 'AUDIO'
+            track['artistID_1'] = self.artists[record['artist']]
+            track['old_filename'] = record['converted_filename']
+
+            tracks.append(track)
+
+        return tracks
+
+    def make_sql_import_stmts(self, tracks:list)-> list:
+        stmts = []
+        for track in tracks:
+            ins_stmt = (f"Insert into Tracks (tracktitle,artistsearch,filepath,class,duration,year,"
+                        f"fadein,fadeout,fadedelay,intro,extro,folderid,onstartevent,onstopevent,"
+                        f"disablenotify,physicalstorageused,trackmediatype,artistID_1, old_filename)"
+                        f" VALUES ( "
+                        f"'{track['tracktitle']}','{track['artistsearch']}','{track['filepath']}', "
+                        f"'{track['class']}',{track['duration']},{track['year']},{track['fadein']},{track['fadeout']},"
+                        f"{track['fadedelay']},{track['intro']},{track['extro']},{track['folderid']},"
+                        f"{track['onstartevent']},{track['onstopevent']},{track['disablenotify']},"
+                        f"{track['physicalstorageused']},'{track['trackmediatype']}',{track['artistID_1']},'{track['old_filename']}' );")
+
+            stmts.append(ins_stmt)
+
+        return stmts
+
+    def write_sql_stmts(self, stmts:list, tree_name:str):
+        print(f"Writing data to: {self.sql_folder}/{tree_name}.sql")
+        with open(f"{self.sql_folder}/{tree_name}.sql", "w") as f:
+            for stmt in stmts:
+                f.write(stmt)
+                f.write("\n")
+
+    def rename_converted_files(self, filename:str):
+        # Open and read filename with the format id|filename
+        with open(filename, "r") as f:
+            records = f.read().split("\n")
+            for record in records:
+                if record == "":
+                    continue
+                id, old_name = record.split("|")
+                # New name is of length 8 padded with 0s
+                new_name = f"{id.zfill(8)}.ogg"
+                print(f"Old name: {old_name}  New name: {new_name}")
+                try:
+                    os.rename(f"{self.output_folder}/{old_name}", f"{self.output_folder}/{new_name}")
+                except:
+                    print(f"Failed to rename {old_name} to {new_name}")
+                    continue
+
 
     def convert(self):
         # Loop through a folder and read all files with extension .dbf
@@ -97,7 +203,6 @@ class AudioConverter:
             self.convert_audio(data, dbf)
 
         self.print_summary()
-
     
 
     def convert_audio(self, data: list, dbf: str):
