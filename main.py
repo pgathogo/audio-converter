@@ -17,6 +17,12 @@ if __name__ == "__main__":
     config_ini = "config.ini"
     config = get_config(config_ini)
     audio_converter = AudioConverter(**config)
-    #audio_converter.convert()   
-    audio_converter.process_import_data()   
+
+    # STEP 1: Convert audio files
+    audio_converter.convert()   
+
+    # STEP 2: Rename audio files
+    #audio_converter.process_import_data()   
+
+    # STEP 3: Rename audio files
     #audio_converter.rename_converted_files("..//input//rename_audio")   
