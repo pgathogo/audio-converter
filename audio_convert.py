@@ -68,7 +68,7 @@ class AudioConverter:
             for record in records:
                 if record == "":
                     continue
-                id, name = record.split(",")
+                id, name = record.split("|")
                 data[name] = int(id)
         return data
 
@@ -399,7 +399,7 @@ class AudioConverter:
         # Write artists to the artists text file, if the artist file does not exists, create it
         with open(f"{self.log_folder}/artists.txt", "w") as f:
             for artist, id in self.artists.items():
-                f.write(f"{id},{artist}\n")
+                f.write(f"{id}|{artist}\n")
 
     def probe_audio_duration(self, audio_file: str)-> float:
         # Get audio duration in seconds
