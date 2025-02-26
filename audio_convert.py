@@ -297,7 +297,12 @@ class AudioConverter:
             total_converted_files += 1
 
             # Get size in KB of input_file
-            output_file_size_kb = os.path.getsize(output_filepath) / 1024
+            try:
+                output_file_size_kb = os.path.getsize(output_filepath) / 1024
+            except OSError as e:
+                print(f"Failed to get size of {output_filepath}: {e}")
+                failed_conversions.append(record)
+                continue
 
             record["conversion_time"] = time_diff.total_seconds()
             record["converted_filename"] = output_file
