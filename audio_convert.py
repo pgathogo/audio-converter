@@ -15,6 +15,8 @@ class AudioConverter:
         self.output_folder = kwargs.get("output_folder", "output/")
         self.log_folder = kwargs.get("log_folder", "log/")
         self.artists_file = kwargs.get("artists_file", "artists.txt")
+        self.artist_export_file = kwargs.get("artist_export_file", "artist_export.txt")
+        self.tree_export_file = kwargs.get("tree_export_file", "tree_export.txt")
         self.process_category = kwargs.get("process_category", "all")
         self.exclude_dbfs = kwargs.get("exclude_dbfs", "")
         self.sql_folder = kwargs.get("sql_folder", "sql/")
@@ -73,7 +75,14 @@ class AudioConverter:
         return data
 
     def process_import_data(self):
-        tree = self.fetch_data("..//input//treeimportdata")
+        tree = self.fetch_data(self.tree_export_file)
+        self.artists = self.fetch_data(self.artist_export_file)
+
+        print(f"Processing data for {len(tree)} trees")
+        print(f"Processing data for {len(self.artists)} artists")
+
+        return
+
         for name, id in tree.items():
             tracks = self.prepare_tracks_import_data(name, id)
             if len(tracks) > 0:
@@ -96,7 +105,7 @@ class AudioConverter:
             track = {}
             track['tracktitle'] = record['title']
             track['artistsearch'] = record['artist']
-            track['filepath'] = "//INOOROFM/AUDIO/"
+            track['filepath'] = "//INOOROFM/AUDIO/"   # Find out the correct path
             track['class'] = 'SONG'
             track['duration'] = record['duration_ms']
             track['year'] = 2020
@@ -128,7 +137,7 @@ class AudioConverter:
         for track in tracks:
             ins_stmt = (f'Insert into Tracks (tracktitle,artistsearch,filepath,class,duration,year,'
                         f'fadein,fadeout,fadedelay,intro,extro,folderid,onstartevent,onstopevent,'
-                        f'disablenotify,physicalstorageused,trackmediatype,artistID_1, eld_filename)'
+                        f'disablenotify,physicalstorageused,trackmediatype,artistID_1, old_filename)'
                         f' VALUES ( '
                         f'"{track["tracktitle"]}","{track["artistsearch"]}","{track["filepath"]}", '
                         f'"{track["class"]}",{track["duration"]},{track["year"]},{track["fadein"]},{track["fadeout"]},'
