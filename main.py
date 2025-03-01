@@ -22,7 +22,7 @@ if __name__ == "__main__":
     #audio_converter.convert()   
 
     # STEP 2: Rename audio files
-    audio_converter.process_import_data()   
+    #audio_converter.process_import_data()   
 
     # STEP 3: Rename audio files
-    #audio_converter.rename_converted_files("..//input//rename_audio")   
+    audio_converter.rename_converted_files()

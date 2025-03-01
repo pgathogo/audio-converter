@@ -17,6 +17,8 @@ class AudioConverter:
         self.artists_file = kwargs.get("artists_file", "artists.txt")
         self.artist_export_file = kwargs.get("artist_export_file", "artist_export.txt")
         self.tree_export_file = kwargs.get("tree_export_file", "tree_export.txt")
+        self.tracks_export_file = kwargs.get("tracks_export_file", "tracks_export.txt")
+        self.converted_files_folder = kwargs.get("converted_files_folder", "converted_files/")
         self.process_category = kwargs.get("process_category", "all")
         self.exclude_dbfs = kwargs.get("exclude_dbfs", "")
         self.sql_folder = kwargs.get("sql_folder", "sql/")
@@ -103,7 +105,7 @@ class AudioConverter:
             track = {}
             track['tracktitle'] = record['title']
             track['artistsearch'] = record['artist']
-            track['filepath'] = "//INOOROFM/AUDIO/"   # Find out the correct path
+            track['filepath'] = "//AUDIO-SERVER/AUDIO/"   # Find out the correct path
             track['class'] = 'SONG'
             track['duration'] = record['duration_ms']
             track['year'] = 2020
@@ -154,22 +156,16 @@ class AudioConverter:
                 f.write(stmt)
                 f.write("\n")
 
-    def rename_converted_files(self, filename:str):
-        # Open and read filename with the format id|filename
-        with open(filename, "r") as f:
-            records = f.read().split("\n")
-            for record in records:
-                if record == "":
-                    continue
-                id, old_name = record.split("|")
-                # New name is of length 8 padded with 0s
-                new_name = f"{id.zfill(8)}.ogg"
-                print(f"Old name: {old_name}  New name: {new_name}")
-                try:
-                    os.rename(f"{self.output_folder}/{old_name}", f"{self.output_folder}/{new_name}")
-                except:
-                    print(f"Failed to rename {old_name} to {new_name}")
-                    continue
+    def rename_converted_files(self):
+        tracks = self.fetch_data(self.tracks_export_file)
+        for old_name, id in tracks.items():
+            new_name = f"{str(id).zfill(8)}.ogg"
+            print(f"Old name: {old_name}  New name: {new_name}")
+            try:
+                os.rename(f"{self.output_folder}/{old_name}", f"{self.converted_files_folder}/{new_name}")
+            except:
+                print(f"Failed to rename {old_name} to {new_name}")
+                continue
 
 
     def convert(self):
