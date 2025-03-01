@@ -81,8 +81,6 @@ class AudioConverter:
         print(f"Processing data for {len(tree)} trees")
         print(f"Processing data for {len(self.artists)} artists")
 
-        return
-
         for name, id in tree.items():
             tracks = self.prepare_tracks_import_data(name, id)
             if len(tracks) > 0:
