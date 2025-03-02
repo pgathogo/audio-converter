@@ -77,6 +77,8 @@ class AudioConverter:
         return data
 
     def process_import_data(self):
+        print("Processing import data")
+
         tree = self.fetch_data(self.tree_export_file)
         self.artists = self.fetch_data(self.artist_export_file)
 
@@ -157,6 +159,8 @@ class AudioConverter:
                 f.write("\n")
 
     def rename_converted_files(self):
+        print("Renaming converted files")
+
         tracks = self.fetch_data(self.tracks_export_file)
         for old_name, id in tracks.items():
             new_name = f"{str(id).zfill(8)}.ogg"
