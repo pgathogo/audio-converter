@@ -746,6 +746,9 @@ class AudioConverter:
 
             data = self.probe_mp3_file(full_filepath)
 
+            if len(data) == 0:
+                continue
+
             if not "title" in data.keys():
                 continue
 
@@ -768,11 +771,15 @@ class AudioConverter:
         if not os.path.exists(filepath):
             return
 
-        cmd = f'ffprobe.exe -i "{filepath}" -show_format -v quiet | grep -E "title|artist|duration"'
-        result = run(cmd, capture_output=True, shell=True, text=True)
-        data_str = result.stdout
-        data_str = data_str.replace("TAG:", "")
-        data_str = data_str.replace("=", ":")
+        try:
+            cmd = f'ffprobe.exe -i "{filepath}" -show_format -v quiet | grep -E "title|artist|duration"'
+            result = run(cmd, capture_output=True, shell=True, text=True, encoding='utf-8')
+            data_str = result.stdout
+            data_str = data_str.replace("TAG:", "")
+            data_str = data_str.replace("=", ":")
+        except:
+            print(f"Error probing file: {filepath} ")
+            return {}
 
         # loop through the string and split it into key value pairs
         # split the string by ":" and loop through the string
