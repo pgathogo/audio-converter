@@ -568,6 +568,8 @@ class AudioConverter:
             if cf['track_id'] == -1:
                 continue
 
+            print(cf)
+
             file_size = self.file_size(cf['ogg_filepath'])
 
             ins_stmt = (f'Insert into Tracks (trackreference, tracktitle,artistsearch,filepath,class,duration,year,'
@@ -725,6 +727,12 @@ class AudioConverter:
 
             data = self.probe_mp3_file(full_filepath)
 
+            if not "title" in data.keys():
+                continue
+
+            if not "artist" in data.keys():
+                continue
+
             data['folder_id'] = folder_id
             data['folder_short_name'] = folder_short_name
             data['mp3_filename'] = mp3_file
@@ -759,10 +767,13 @@ class AudioConverter:
         for data_value in data_values:
             if data_value == "":
                 continue
+
             key, value = data_value.split(":")
+
             # Remove all return characters and new lines
             value = value.replace("\n", "").replace("\r", "").strip()
             key = key.strip()
+
             if (key == "duration"):
                 # Convert duration to milliseconds
                 value = float(value)
