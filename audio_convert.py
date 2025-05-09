@@ -8,6 +8,8 @@ from dbf_reader import get_data
 
 from subprocess import PIPE, run
 
+from mssql_data import MSSQLData, read_registry
+
 class AudioConverter:
     def __init__(self, **kwargs):
         self.dbf_folder = kwargs.get("dbf_folder", "dbf/")
@@ -22,6 +24,7 @@ class AudioConverter:
         self.process_category = kwargs.get("process_category", "all")
         self.exclude_dbfs = kwargs.get("exclude_dbfs", "")
         self.sql_folder = kwargs.get("sql_folder", "sql/")
+        self.include_folders = kwargs.get("include_folders", "")  # For mp3 folders
 
         converted = kwargs.get("keep_converted", "False")
         if converted == "True":
@@ -30,6 +33,9 @@ class AudioConverter:
             self.keep_converted = False
 
         self.artists = self.fetch_data(self.artists_file)
+        self.folders = {}
+
+        self.mssql_con = self._make_mssql_connection()
 
         self.total_mts_files = 0
         self.total_converted_files = 0
@@ -39,6 +45,14 @@ class AudioConverter:
         self.total_conversion_time = 0
         self.total_conversion_time_str = ""
         self.total_zero_bytes_files = 0
+
+    def _make_mssql_connection(self):
+        reg = read_registry()
+        server = reg['server']
+        database = reg['database']
+        username = reg['username']  
+        password = reg['password']
+        return MSSQLData(server, database, username, password)
 
     def fetch_artists(self, file) ->dict[int, str]:
         # Check if the file exists
@@ -152,8 +166,9 @@ class AudioConverter:
         return stmts
 
     def write_sql_stmts(self, stmts:list, tree_name:str):
-        print(f"Writing data to: {self.sql_folder}/{tree_name}.sql")
-        with open(f"{self.sql_folder}/{tree_name}.sql", "w") as f:
+        filename = f"{self.sql_folder}/{tree_name}.sql"
+        print(f"Writing data to: {filename}")
+        with open(f"{filename}", "w") as f:
             for stmt in stmts:
                 f.write(stmt)
                 f.write("\n")
@@ -428,3 +443,344 @@ class AudioConverter:
         print(f"Writing data to: {self.dbf_folder}/{dbf}.json")
         with open(f"{self.dbf_folder}/{dbf}.json", "w") as f:
             json.dump(data, f, indent=4)
+
+    def convert_mp3_to_ogg(self):
+        if not os.path.exists("ffmpeg.exe"):
+            raise Exception("ffmpeg is not installed")
+
+        self.artists = self.read_artists_from_db()
+        self.folders = self.read_track_folders_from_db()
+
+        mp3_folders = [dir for dir in os.listdir(f"{self.audio_folder}")
+                        if os.path.isdir(os.path.join(self.audio_folder, dir))]
+
+        audio_folders = {}
+
+        include_folders = self.include_folders.split(",")
+
+        for mp3_folder in mp3_folders:
+
+            short_folder_name =  mp3_folder[:mp3_folder.index("-")].strip()
+            if len(include_folders) > 0:
+                if short_folder_name not in include_folders:
+                    continue
+
+            folder_id = self.folders[short_folder_name]
+            filepath = f"{self.audio_folder}/{mp3_folder}"
+
+            folder = {'folder_id': folder_id,
+                    'folder_short_name': short_folder_name,
+                    'filepath': filepath}
+
+            mp3_files = self.read_mp3_audio_files(folder)
+
+            audio_folders[short_folder_name] = mp3_files
+
+        converted_files = []
+
+        for folder, files in audio_folders.items():
+            for file in files:
+
+                output_filepath =  self.make_output_filename(file)
+                file['output_filepath'] = output_filepath
+
+                # Check file size
+                mp3_file = file['full_filepath']
+                if self.file_size(mp3_file) == 0:
+                    print(f"Zero bytes file: {mp3_file} ...Skipping.")
+                    continue
+
+                if self.keep_converted:
+                    if os.path.exists(output_filepath):
+                        print(f"Output file already exists: {output_filepath}  ... skipping")
+                        continue
+
+                # BEGIN-TESTING
+                #converted_files.append(file)
+                #continue
+                # END-TESTING
+
+                if self.mp3_to_ogg(file):
+                    converted_files.append(file)
+                else:
+                    self.failed_conversions.append(file)
+
+        max_track_id = self.get_max_track_id()
+        print(f"Current Max Track ID....: {max_track_id}")
+        
+        for converted_file in converted_files:
+            max_track_id += 1
+            filepath = self.output_folder  #converted_file['filepath']
+
+            output_filepath = converted_file['output_filepath']
+            ogg_filepath = self.make_ogg_filepath(filepath, max_track_id)
+
+            #TEST::BEGIN REMOVE
+            #converted_file['ogg_filepath'] = ogg_filepath
+            #converted_file['track_id'] = max_track_id
+            #continue
+            # TEST::END
+
+            if not self.rename_converted_file_to_ogg(output_filepath, ogg_filepath):
+                print(f"Failed to rename {output_filepath} to {ogg_filepath}")
+                converted_file['ogg_filepath'] =""
+                max_track_id -= 1
+            else:
+                converted_file['ogg_filepath'] = ogg_filepath
+                converted_file['track_id'] = max_track_id
+
+        # Generated SQL insert statements
+        conv_files = [cf for cf in converted_files if cf['ogg_filepath'] != ""]
+
+        for folder in include_folders:
+            print(f"Writing DB statements for `{folder}` ...")
+            folder_files = [cf for cf in conv_files if cf['folder_short_name'] == folder]
+
+            print(folder_files)
+
+            sql_stmts = self.generate_insert_statements(folder_files)
+            self.write_sql_stmts(sql_stmts, folder)
+        
+        # Write insert statements for new artist
+        new_artists = []
+
+        for artist_name, data in self.artists.items():
+            if data['in_db']:
+                continue
+            new_artists.append({'id': data['id'], 'name':artist_name})
+
+        print(f"Generating DB statements for artists ...")
+        sql_stmts = self.generate_artists_insert_stmts(new_artists)
+
+        print(f"Writting `ARTISTS.sql' file ...")
+        self.write_sql_stmts(sql_stmts, "ARTISTS")
+
+        print(f"Processing done.")
+
+
+    def generate_insert_statements(self, conv_files: list):
+        audio_folder = fr"{self.get_audio_folder()}"
+
+        audio_folder = audio_folder.replace("\\\\", "\\")
+
+        stmts = []
+        for cf in conv_files:
+            file_size = self.file_size(cf['ogg_filepath'])
+            ins_stmt = (f'Insert into Tracks (trackreference, tracktitle,artistsearch,filepath,class,duration,year,'
+                        f'fadein,fadeout,fadedelay,intro,extro,folderid,onstartevent,onstopevent,'
+                        f'disablenotify,physicalstorageused,trackmediatype,artistID_1)'
+                        f' VALUES ( '
+                        f'{cf["track_id"]},"{cf["title"]}","{cf["artist"]}","{audio_folder}", '
+                        f'"SONG",{cf["duration"]},2025,0,0,0,0,0,{cf["folder_id"]},-1,-1,0,'
+                        f'{file_size},"AUDIO",{cf["artist_id"]});')
+
+            stmts.append(ins_stmt)
+        return stmts
+
+
+    def generate_artists_insert_stmts(self, artists: list) -> list:
+        stmts = []
+        for artist in artists:
+            stmt = (f'Insert into Artists (ArtistID, ArtistSurname, ArtistType) '
+                         f'VALUES ("{artist["id"]}", "{artist["name"]}", "GROUP" );')
+
+            stmts.append(stmt)
+
+        return stmts
+
+    def mp3_to_ogg(self, file) ->bool:
+        input_filepath = file['full_filepath']
+        output_filepath = file['output_filepath']
+
+        print(f"Converting file...: {input_filepath} => {output_filepath}")
+        try:
+            os.system(f'ffmpeg -y -i "{input_filepath}" -nostats -loglevel 0 -c:a libvorbis -q:a 4 -vsync 2 "{output_filepath}"')
+            return True
+        except:
+            return False
+
+    def make_output_filename(self, file) ->str:
+        mp3_filename = file['mp3_filename']
+        filepath = self.output_folder   #file['filepath']
+        return f"{filepath}/{mp3_filename[:-4]}.OGG"
+
+    def make_ogg_filepath(self, filepath:str, track_id:int) ->str:
+        ogg_filename = f"{str(track_id).zfill(8)}.ogg"
+        ogg_filepath = f"{filepath}/{ogg_filename}"
+        return ogg_filepath
+
+    def rename_converted_file_to_ogg(self, old_file: str, new_file:str) ->bool:
+        try:
+            os.rename(old_file, new_file)
+            return True
+        except:
+            print(f"Failed to rename {old_file} to {new_file}")
+            return False
+
+    def get_max_track_id(self):
+        if not self.mssql_con.connect():
+            print("Failed to connect to database")
+            return
+        cursor = self.mssql_con.conn.cursor()
+        cursor.execute("SELECT max(TrackReference) max_id FROM Tracks")
+        rows = cursor.fetchall()
+
+        for row in rows:
+            max_id = row[0]
+
+        self.mssql_con.disconnect()
+
+        return max_id
+
+    def file_size(self, file) ->float:
+        file_in_bytes = 0
+        try:
+            # Get size in KB of input_file
+            file_in_bytes = os.path.getsize(file)
+        except OSError as e:
+            print(f"Failed to get size of {file}: {e}")
+            return 0
+
+        input_file_size_kb = file_in_bytes / 1024
+        return input_file_size_kb
+
+
+    def read_artists_from_db(self) ->dict:
+        # Read artists from the database
+        if not self.mssql_con.connect():
+            print("Failed to connect to database")
+            return
+
+        cursor = self.mssql_con.conn.cursor()
+        cursor.execute("SELECT ArtistID, ArtistSurname FROM Artists")
+        rows = cursor.fetchall()
+
+        ARTIST_ID = 0
+        ARTIST_NAME = 1
+
+        artists = {}
+        for row in rows:
+            artists[row[ARTIST_NAME]] = {'id':row[ARTIST_ID], 'in_db':True}
+
+        self.mssql_con.disconnect()
+
+        return artists
+
+
+    def read_track_folders_from_db(self) ->dict:
+        # Read tree from the database
+        if not self.mssql_con.connect():
+            print("Failed to connect to database")
+            return
+
+        cursor = self.mssql_con.conn.cursor()
+        cursor.execute("SELECT NodeID, NodeName FROM Tree")
+        rows = cursor.fetchall()
+
+        NODE_ID = 0
+        NODE_NAME = 1
+
+        folders = {}
+        for row in rows:
+            folders[row[NODE_NAME]] = row[NODE_ID]  
+
+        self.mssql_con.disconnect()
+
+        return folders
+    
+    def get_audio_folder(self):
+        if not self.mssql_con.connect():
+            print("Failed to connect to database")
+            return
+
+        cursor = self.mssql_con.conn.cursor()
+        cursor.execute("SELECT DefRecordLocation FROM System")
+        rows = cursor.fetchall()
+
+        audio_location = ""
+
+        for row in rows:
+            audio_location = row[0]
+
+        self.mssql_con.disconnect()
+
+        return audio_location
+
+
+    def read_mp3_audio_files(self, mp3_folder:str) ->list:
+        folder_id = mp3_folder['folder_id']
+        filepath = mp3_folder['filepath']
+        folder_short_name = mp3_folder['folder_short_name']
+
+        mp3_raw_files = [f for f in os.listdir(filepath) if f.endswith('.mp3')]
+
+        data_files = []
+
+        for mp3_file in mp3_raw_files:
+            full_filepath = f"{filepath}/{mp3_file}"
+
+            data = self.probe_mp3_file(full_filepath)
+
+            data['folder_id'] = folder_id
+            data['folder_short_name'] = folder_short_name
+            data['mp3_filename'] = mp3_file
+            data['filepath'] = filepath
+            data['full_filepath'] = full_filepath
+
+            data_files.append(data)
+        
+        return data_files
+
+
+    def probe_mp3_file(self, filepath) -> dict:
+
+        if not os.path.exists(filepath):
+            return
+
+        cmd = f'ffprobe.exe -i "{filepath}" -show_format -v quiet | grep -E "title|artist|duration"'
+        result = run(cmd, capture_output=True, shell=True, text=True)
+        data_str = result.stdout
+        data_str = data_str.replace("TAG:", "")
+        data_str = data_str.replace("=", ":")
+
+        # loop through the string and split it into key value pairs
+        # split the string by ":" and loop through the string
+        # and split it into key value pairs
+
+        data = {}
+        key = ""
+
+        data_values = data_str.split("\n")
+
+        for data_value in data_values:
+            if data_value == "":
+                continue
+            key, value = data_value.split(":")
+            # Remove all return characters and new lines
+            value = value.replace("\n", "").replace("\r", "").strip()
+            key = key.strip()
+            if (key == "duration"):
+                # Convert duration to milliseconds
+                value = float(value)
+                value = int(value * 1000)
+
+            if (key == 'artist'):
+                # Check if the artist is in the artists dictionary
+                if value not in self.artists.keys():
+                    print(f"Missing artists: {value}")
+                    # Add the artist to the artists dictionary
+                    artist_id = len(self.artists) + 1
+                    self.artists[value] = {'id':artist_id, 'in_db':False}
+                    data["artist_id"] = artist_id
+                else:
+                    artist_id = self.artists[value]['id']
+                    data["artist_id"] = artist_id
+
+            data[key] = value
+
+        data["filepath"] = filepath
+
+        return data
+    
+  
+

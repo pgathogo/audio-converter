@@ -19,11 +19,13 @@ if __name__ == "__main__":
     config_ini = "config.ini"
     config = get_config(config_ini)
     audio_converter = AudioConverter(**config)
+
     parser = argparse.ArgumentParser(description="Convert and rename audio files")
 
     parser.add_argument("--c", action="store_true", help="Convert audio files")
     parser.add_argument("--p", action="store_true", help="process converted files")
     parser.add_argument("--r", action="store_true", help="Rename audio files")
+    parser.add_argument("--m", action="store_true", help="Read MP3 folder")
     args = parser.parse_args()
 
     if args.c:
@@ -32,6 +34,8 @@ if __name__ == "__main__":
         audio_converter.process_import_data()
     elif args.r:
         audio_converter.rename_converted_files()
+    elif args.m:
+        audio_converter.convert_mp3_to_ogg()
     else:
         parser.print_help()
         print('\n')
