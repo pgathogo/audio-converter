@@ -37,6 +37,8 @@ class AudioConverter:
 
         self.mssql_con = self._make_mssql_connection()
 
+        self.max_artist_id = self.get_max_artist_id()
+
         self.total_mts_files = 0
         self.total_converted_files = 0
         self.total_failed_conversions = 0
@@ -588,7 +590,7 @@ class AudioConverter:
         stmts = []
         for artist in artists:
             stmt = (f'Insert into Artists (ArtistID, ArtistSurname, ArtistType) '
-                         f'VALUES ("{artist["id"]}", "{artist["name"]}", "GROUP" );')
+                         f'VALUES ({artist["id"]}, "{artist["name"]}", "GROUP" );')
 
             stmts.append(stmt)
 
@@ -637,6 +639,23 @@ class AudioConverter:
         self.mssql_con.disconnect()
 
         return max_id
+
+    def get_max_artist_id(self):
+        if not self.mssql_con.connect():
+            print("Failed to connect to database")
+            return
+
+        cursor = self.mssql_con.conn.cursor()
+        cursor.execute("SELECT max(ArtistID) max_id FROM Artists")
+        rows = cursor.fetchall()
+
+        for row in rows:
+            max_id = row[0]
+
+        self.mssql_con.disconnect()
+
+        return max_id
+
 
     def file_size(self, file) ->float:
         file_in_bytes = 0
@@ -784,9 +803,9 @@ class AudioConverter:
                 if value not in self.artists.keys():
                     print(f"Missing artists: {value}")
                     # Add the artist to the artists dictionary
-                    artist_id = len(self.artists) + 1
-                    self.artists[value] = {'id':artist_id, 'in_db':False}
-                    data["artist_id"] = artist_id
+                    self.max_artist_id = self.max_artist_id + 1
+                    self.artists[value] = {'id':self.max_artist_id, 'in_db':False}
+                    data["artist_id"] = self.max_artist_id
                 else:
                     artist_id = self.artists[value]['id']
                     data["artist_id"] = artist_id
