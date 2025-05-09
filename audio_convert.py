@@ -776,6 +776,7 @@ class AudioConverter:
             result = run(cmd, capture_output=True, shell=True, text=True, encoding='utf-8')
             data_str = result.stdout
             data_str = data_str.replace("TAG:", "")
+            data_str = data_str.replace(":", " ")
             data_str = data_str.replace("=", ":")
         except:
             print(f"Error probing file: {filepath} ")
