@@ -525,6 +525,7 @@ class AudioConverter:
                 print(f"Failed to rename {output_filepath} to {ogg_filepath}")
                 converted_file['ogg_filepath'] =""
                 max_track_id -= 1
+                converted_file['track_id'] = -1
             else:
                 converted_file['ogg_filepath'] = ogg_filepath
                 converted_file['track_id'] = max_track_id
@@ -535,8 +536,6 @@ class AudioConverter:
         for folder in include_folders:
             print(f"Writing DB statements for `{folder}` ...")
             folder_files = [cf for cf in conv_files if cf['folder_short_name'] == folder]
-
-            print(folder_files)
 
             sql_stmts = self.generate_insert_statements(folder_files)
             self.write_sql_stmts(sql_stmts, folder)
@@ -565,7 +564,12 @@ class AudioConverter:
 
         stmts = []
         for cf in conv_files:
+
+            if cf['track_id'] == -1:
+                continue
+
             file_size = self.file_size(cf['ogg_filepath'])
+
             ins_stmt = (f'Insert into Tracks (trackreference, tracktitle,artistsearch,filepath,class,duration,year,'
                         f'fadein,fadeout,fadedelay,intro,extro,folderid,onstartevent,onstopevent,'
                         f'disablenotify,physicalstorageused,trackmediatype,artistID_1)'
