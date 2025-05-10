@@ -172,7 +172,7 @@ class AudioConverter:
         print(f"Writing data to: {filename}")
 
         try:
-            with open(f"{filename}", "w") as f:
+            with open(f"{filename}", "w", encoding='utf-8') as f:
                 try:
                     for stmt in stmts:
                         f.write(stmt)
