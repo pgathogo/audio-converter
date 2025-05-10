@@ -167,13 +167,24 @@ class AudioConverter:
 
         return stmts
 
-    def write_sql_stmts(self, stmts:list, tree_name:str):
+    def write_sql_stmts(self, stmts:list, tree_name:str) ->bool:
         filename = f"{self.sql_folder}/{tree_name}.sql"
         print(f"Writing data to: {filename}")
-        with open(f"{filename}", "w") as f:
-            for stmt in stmts:
-                f.write(stmt)
-                f.write("\n")
+
+        try:
+            with open(f"{filename}", "w") as f:
+                try:
+                    for stmt in stmts:
+                        f.write(stmt)
+                        f.write("\n")
+                except(IOError, OSError):
+                    print(f"*ERROR* : Writing to file {filename}")
+                    return False
+        except (FileNotFoundError, PermissionError, OSError):
+            print(f"*ERROR* : Opening file {filename}")
+            return False
+
+        return True
 
     def rename_converted_files(self):
         print("Renaming converted files")
@@ -478,9 +489,19 @@ class AudioConverter:
 
             audio_folders[short_folder_name] = mp3_files
 
-        converted_files = []
+        max_track_id = self.get_max_track_id()
+        print(f"Current Max Track ID....: {max_track_id}")
+
+        counter = 0
 
         for folder, files in audio_folders.items():
+
+            counter += 1
+
+            print(f"Processing folder {folder}...")
+
+            converted_files = []
+
             for file in files:
 
                 output_filepath =  self.make_output_filename(file)
@@ -507,42 +528,57 @@ class AudioConverter:
                 else:
                     self.failed_conversions.append(file)
 
-        max_track_id = self.get_max_track_id()
-        print(f"Current Max Track ID....: {max_track_id}")
+            # max_track_id = self.get_max_track_id()
+            # print(f"Current Max Track ID....: {max_track_id}")
         
-        for converted_file in converted_files:
-            max_track_id += 1
-            filepath = self.output_folder  #converted_file['filepath']
+            for converted_file in converted_files:
+                max_track_id += 1
+                filepath = self.output_folder  #converted_file['filepath']
 
-            output_filepath = converted_file['output_filepath']
-            ogg_filepath = self.make_ogg_filepath(filepath, max_track_id)
+                output_filepath = converted_file['output_filepath']
+                ogg_filepath = self.make_ogg_filepath(filepath, max_track_id)
 
-            #TEST::BEGIN REMOVE
-            #converted_file['ogg_filepath'] = ogg_filepath
-            #converted_file['track_id'] = max_track_id
-            #continue
-            # TEST::END
+                #TEST::BEGIN REMOVE
+                #converted_file['ogg_filepath'] = ogg_filepath
+                #converted_file['track_id'] = max_track_id
+                #continue
+                # TEST::END
 
-            if not self.rename_converted_file_to_ogg(output_filepath, ogg_filepath):
-                print(f"Failed to rename {output_filepath} to {ogg_filepath}")
-                converted_file['ogg_filepath'] =""
-                max_track_id -= 1
-                converted_file['track_id'] = -1
-            else:
-                converted_file['ogg_filepath'] = ogg_filepath
-                converted_file['track_id'] = max_track_id
+                if not self.rename_converted_file_to_ogg(output_filepath, ogg_filepath):
+                    print(f"Failed to rename {output_filepath} to {ogg_filepath}")
+                    converted_file['ogg_filepath'] =""
+                    max_track_id -= 1
+                    converted_file['track_id'] = -1
+                else:
+                    converted_file['ogg_filepath'] = ogg_filepath
+                    converted_file['track_id'] = max_track_id
 
+            if not self.write_artists_insert_stmts_to_file(folder, counter):
+                print(f"Failed to write Artists insert statements for folder: {folder} ")
+                print(f"Process terminated.")
+                return
+
+            if not self.write_tracks_insert_stmts_to_file(folder, converted_files):
+                print(f"Failed to write Tracks insert statments for folder: {folder}")
+                print(f"Process terminated.")
+                return
+
+        print(f"File conversion done.")
+        print(f"Last folder: {folder}")
+
+    def write_tracks_insert_stmts_to_file(self, folder: str, converted_files:dict) ->bool:
         # Generated SQL insert statements
         conv_files = [cf for cf in converted_files if cf['ogg_filepath'] != ""]
 
-        for folder in include_folders:
-            print(f"Writing DB statements for `{folder}` ...")
-            folder_files = [cf for cf in conv_files if cf['folder_short_name'] == folder]
+        print(f"Writing DB statements for `{folder}` ...")
+        #folder_files = [cf for cf in conv_files if cf['folder_short_name'] == folder]
 
-            sql_stmts = self.generate_insert_statements(folder_files)
-            self.write_sql_stmts(sql_stmts, folder)
-        
-        # Write insert statements for new artist
+        sql_stmts = self.generate_insert_statements(conv_files)
+
+        return self.write_sql_stmts(sql_stmts, folder)
+
+
+    def write_artists_insert_stmts_to_file(self, folder:str, counter: int):
         new_artists = []
 
         for artist_name, data in self.artists.items():
@@ -553,10 +589,9 @@ class AudioConverter:
         print(f"Generating DB statements for artists ...")
         sql_stmts = self.generate_artists_insert_stmts(new_artists)
 
-        print(f"Writting `ARTISTS.sql' file ...")
-        self.write_sql_stmts(sql_stmts, "ARTISTS")
-
-        print(f"Processing done.")
+        filename = f"artists_{folder}_{counter}"
+        print(f"Writting `{filename}` file ...")
+        return self.write_sql_stmts(sql_stmts, filename)
 
 
     def generate_insert_statements(self, conv_files: list):
