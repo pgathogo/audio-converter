@@ -509,7 +509,7 @@ class AudioConverter:
 
                 # Check file size
                 mp3_file = file['full_filepath']
-                if self.file_size(mp3_file) == 0:
+                if self.get_file_size(mp3_file) == 0:
                     print(f"Zero bytes file: {mp3_file} ...Skipping.")
                     continue
 
@@ -518,31 +518,17 @@ class AudioConverter:
                         print(f"Output file already exists: {output_filepath}  ... skipping")
                         continue
 
-                # BEGIN-TESTING
-                #converted_files.append(file)
-                #continue
-                # END-TESTING
-
                 if self.mp3_to_ogg(file):
                     converted_files.append(file)
                 else:
                     self.failed_conversions.append(file)
-
-            # max_track_id = self.get_max_track_id()
-            # print(f"Current Max Track ID....: {max_track_id}")
         
             for converted_file in converted_files:
                 max_track_id += 1
-                filepath = self.output_folder  #converted_file['filepath']
+                filepath = self.output_folder  
 
                 output_filepath = converted_file['output_filepath']
                 ogg_filepath = self.make_ogg_filepath(filepath, max_track_id)
-
-                #TEST::BEGIN REMOVE
-                #converted_file['ogg_filepath'] = ogg_filepath
-                #converted_file['track_id'] = max_track_id
-                #continue
-                # TEST::END
 
                 if not self.rename_converted_file_to_ogg(output_filepath, ogg_filepath):
                     print(f"Failed to rename {output_filepath} to {ogg_filepath}")
@@ -571,7 +557,6 @@ class AudioConverter:
         conv_files = [cf for cf in converted_files if cf['ogg_filepath'] != ""]
 
         print(f"Writing DB statements for `{folder}` ...")
-        #folder_files = [cf for cf in conv_files if cf['folder_short_name'] == folder]
 
         sql_stmts = self.generate_insert_statements(conv_files)
 
@@ -607,7 +592,7 @@ class AudioConverter:
 
             print(cf)
 
-            file_size = self.file_size(cf['ogg_filepath'])
+            file_size = self.get_file_size(cf['ogg_filepath'])
 
             ins_stmt = (f'Insert into Tracks (trackreference, tracktitle,artistsearch,filepath,class,duration,year,'
                         f'fadein,fadeout,fadedelay,intro,extro,folderid,onstartevent,onstopevent,'
@@ -642,9 +627,9 @@ class AudioConverter:
         except:
             return False
 
-    def make_output_filename(self, file) ->str:
+    def make_output_filename(self, file: dict) ->str:
         mp3_filename = file['mp3_filename']
-        filepath = self.output_folder   #file['filepath']
+        filepath = self.output_folder   
         return f"{filepath}/{mp3_filename[:-4]}.OGG"
 
     def make_ogg_filepath(self, filepath:str, track_id:int) ->str:
@@ -692,7 +677,7 @@ class AudioConverter:
         return max_id
 
 
-    def file_size(self, file) ->float:
+    def get_file_size(self, file:str) ->float:
         file_in_bytes = 0
         try:
             # Get size in KB of input_file
