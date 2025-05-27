@@ -61,7 +61,6 @@ class AudioConverter:
         if not os.path.exists(file):
             return {}
 
-
         # Read artists from a file with the following format : id, name
         with open(file, "r") as f:
             data = f.read().split("\n")
@@ -764,16 +763,21 @@ class AudioConverter:
         for mp3_file in mp3_raw_files:
             full_filepath = f"{filepath}/{mp3_file}"
 
+            print(f"Probing file: {full_filepath}")
+
             data = self.probe_mp3_file(full_filepath)
 
             if len(data) == 0:
                 continue
 
             if not "title" in data.keys():
-                continue
+                # Get title from the filename
+                data['title'] = mp3_file[:-4]
+                #continue
 
             if not "artist" in data.keys():
                 continue
+
 
             data['folder_id'] = folder_id
             data['folder_short_name'] = folder_short_name
@@ -839,6 +843,18 @@ class AudioConverter:
                     data["artist_id"] = artist_id
 
             data[key] = value
+
+        # If we dont have an artist, we create a default one called "Unknown Artist"
+        if "artist_id" not in data.keys():
+            if not "Unknown Artist" in self.artists.keys():
+                self.max_artist_id += 1
+                data["artist_id"] = self.max_artist_id
+                self.artists["Unknown Artist"] = {'id': self.max_artist_id, 'in_db': False}
+            else:
+                artist_id = self.artists["Unknown Artist"]['id']
+                data["artist_id"] = artist_id
+
+            data["artist"] = "Unknown Artist"
 
         data["filepath"] = filepath
 
