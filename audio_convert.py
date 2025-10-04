@@ -4,11 +4,55 @@ from timeit import default_timer as timer
 import datetime
 from datetime import timedelta
 
+from pathlib import Path, WindowsPath
+
 from dbf_reader import get_data
 
 from subprocess import PIPE, run
 
 from mssql_data import MSSQLData, read_registry
+
+
+class Node:
+    def __init__(self, name, parent=None):
+        self.name = name
+        self.path = None
+        self.children = {}
+        self.parent = parent
+        self.is_file = False
+        self.is_dir = False
+
+    def add_child(self, child_node):
+        self.children[child_node.name] = child_node
+
+    def __repr__(self):
+        return f"Node(name='{self.name}', type='{'file' if self.is_file else 'dir'}')"
+
+
+class TreeNode:
+    Folder_ID_COUNTER = 1
+    File_ID_COUNTER = 1
+    def __init__(self, name, is_file=False, filepath="", parent=None):
+        self.name = name
+        self.is_file = is_file
+        self.filepath = filepath
+        self.parent = parent
+        self.children = []
+        self.node_id = TreeNode.File_ID_COUNTER
+        TreeNode.File_ID_COUNTER += 1
+        if is_file:
+             self.node_id = TreeNode.File_ID_COUNTER
+             TreeNode.File_ID_COUNTER += 1
+        else:
+            self.node_id = TreeNode.Folder_ID_COUNTER
+            TreeNode.Folder_ID_COUNTER += 1
+
+    def add_child(self, child_node):
+        child_node.parent = self
+        self.children.append(child_node)
+
+
+
 
 class AudioConverter:
     def __init__(self, **kwargs):
@@ -778,7 +822,6 @@ class AudioConverter:
             if not "artist" in data.keys():
                 continue
 
-
             data['folder_id'] = folder_id
             data['folder_short_name'] = folder_short_name
             data['mp3_filename'] = mp3_file
@@ -859,6 +902,112 @@ class AudioConverter:
         data["filepath"] = filepath
 
         return data
-    
-  
+
+
+    def walk_mp3_folders(self, root_folder:str) -> list:
+        all_data = []
+        folder_struct = {}
+        folder_struct[root_folder] = {}
+        for dirpath, dirnames, filenames in os.walk(root_folder):
+            print(f"Processing folder: {dirnames}")
+            for filename in filenames:
+                if filename.endswith('.mp3'):
+                    full_path = os.path.join(dirpath, filename)
+                    print(f"Probing file: {full_path}")
+                    # data = self.probe_mp3_file(full_path)
+                    # if data:
+                    #     all_data.append(data)
+        return all_data
+
+    def build_tree(self, path: Path, parent=None) -> TreeNode:
+        node = TreeNode(path.name, is_file=path.is_file(), filepath=path, parent=parent)
+        if path.is_dir():
+            for child_path in sorted(path.iterdir(), key=lambda p: (p.is_file(), p.name)):
+                child_node = self.build_tree(child_path, parent=node)
+                node.add_child(child_node)
+        return node
+
+    def extract_tree(self, node: TreeNode) -> dict:
+        tree_list = {}
+        tree_list[node.node_id] = {
+            'name': node.name,            'is_file': node.is_file,
+            'parent_id': node.parent.node_id if node.parent else None,
+            'children_ids': [child.node_id for child in node.children],
+            'filepath': str(WindowsPath(node.filepath)),
+            'outputfilepath':f"{self.output_folder}/{node.node_id:08d}.ogg" if node.is_file else None
+        }
+        for child in node.children:
+            tree_list.update(self.extract_tree(child))
+        return tree_list
+
+    def print_tree(self, node: TreeNode, indent: str = ""):
+        print(indent + ("📄 " if node.is_file else "📁 ") + node.name + "("+ (str(node.node_id) + ":" + str(node.parent.node_id) if node.parent else "root") +")")
+        for child in node.children:
+            self.print_tree(child, indent + "    ")
+
+    def print_tree_with_counts(self, node: TreeNode, indent: str = ""):
+        # Print current node with file/folder icon
+        print(indent + ("📄 " if node.is_file else "📁 ") + node.name)
+
+        # Initialize counts for this subtree
+        folder_count = 0
+        file_count = 0
+
+        # Current node counts as folder if not a file
+        if node.is_file:
+            file_count += 1
+        else:
+            folder_count += 1
+
+        # Recurse into children and aggregate counts
+        for child in node.children:
+            child_folders, child_files = self.print_tree_with_counts(child, indent + "    ")
+            folder_count += child_folders
+            file_count += child_files
+
+        return folder_count, file_count
+
+
+    # def build_tree(self, start_path):
+    #     """
+    #     Traverses a directory and builds a tree of Node objects.
+    #     """
+    #     # Create the root node for the starting directory
+    #     root_name = os.path.basename(os.path.abspath(start_path))
+    #     root_node = Node(root_name)
+    #     root_node.path = os.path.abspath(start_path)
+
+    #     # Dictionary to keep track of created nodes by their path
+    #     nodes_by_path = {root_node.path: root_node}
+
+    #     print(nodes_by_path)
+
+    #     for dirpath, dirnames, filenames in os.walk(start_path):
+    #         current_node = nodes_by_path[dirpath]
+
+    #         # Add subdirectories as child nodes
+    #         for dirname in dirnames:
+    #             dir_node = Node(dirname, parent=current_node, is_file=False)
+    #             dir_node.path = os.path.join(dirpath, dirname)
+    #             current_node.add_child(dir_node)
+    #             nodes_by_path[dir_node.path] = dir_node
+
+    #         # Add files as child nodes
+    #         for filename in filenames:
+    #             file_node = Node(filename, parent=current_node, is_file=True)
+    #             file_node.path = os.path.join(dirpath, filename)
+    #             current_node.add_child(file_node)
+
+    #     return root_node
+
+    # def print_tree(self, node, indent=0):
+    #     """
+    #     A helper function to visualize the tree structure.
+    #     """
+    #     prefix = "└── " if indent > 0 else ""
+    #     print(" " * indent * 4 + prefix + node.name)
+        
+    #     # Sort children to ensure consistent output
+    #     for child_name in sorted(node.children.keys()):
+    #         self.print_tree(node.children[child_name], indent + 1)
 

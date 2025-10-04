@@ -1,6 +1,8 @@
 *~
 .*~
 *.ini
+files.json
+folders.csv
 Audio/
 Output/
 DBF/
