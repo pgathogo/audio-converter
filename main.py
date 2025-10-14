@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 import argparse
 from audio_convert import AudioConverter
 
@@ -15,6 +17,20 @@ def get_config(config_file: str) -> dict:
 
     return config
 
+def write_files(filename: str, lines: list):
+    with open(filename, "w", encoding="utf-8") as f:
+        for line in lines:
+            f.write(line + "\n")
+
+def make_row_dict(node_id: int, item: dict) -> dict:
+    row = {}
+    row['Node_ID'] = node_id
+    row['Name'] = item['name']
+    row['Parent_ID'] = item['parent_id']
+    row['filepath'] = item.get('filepath','')
+    row['outputfilepath'] = item.get('outputfilepath','')
+    return row
+
 if __name__ == "__main__":
     config_ini = "config.ini"
     config = get_config(config_ini)
@@ -26,6 +42,7 @@ if __name__ == "__main__":
     parser.add_argument("--p", action="store_true", help="process converted files")
     parser.add_argument("--r", action="store_true", help="Rename audio files")
     parser.add_argument("--m", action="store_true", help="Read MP3 folder")
+    parser.add_argument("--w", action="store_true", help="Walks through MP3 folders")
     args = parser.parse_args()
 
     if args.c:
@@ -36,6 +53,8 @@ if __name__ == "__main__":
         audio_converter.rename_converted_files()
     elif args.m:
         audio_converter.convert_mp3_to_ogg()
+    elif args.w:
+        audio_converter.prepare_files_for_conversion("D:/CHAMLIVE")
     else:
         parser.print_help()
         print('\n')

@@ -4,11 +4,55 @@ from timeit import default_timer as timer
 import datetime
 from datetime import timedelta
 
+from pathlib import Path, WindowsPath
+
 from dbf_reader import get_data
 
 from subprocess import PIPE, run
 
 from mssql_data import MSSQLData, read_registry
+
+
+class Node:
+    def __init__(self, name, parent=None):
+        self.name = name
+        self.path = None
+        self.children = {}
+        self.parent = parent
+        self.is_file = False
+        self.is_dir = False
+
+    def add_child(self, child_node):
+        self.children[child_node.name] = child_node
+
+    def __repr__(self):
+        return f"Node(name='{self.name}', type='{'file' if self.is_file else 'dir'}')"
+
+
+class TreeNode:
+    Folder_ID_COUNTER = 1
+    File_ID_COUNTER = 1
+    def __init__(self, name, is_file=False, filepath="", parent=None):
+        self.name = name
+        self.is_file = is_file
+        self.filepath = filepath
+        self.parent = parent
+        self.children = []
+        self.node_id = TreeNode.File_ID_COUNTER
+        TreeNode.File_ID_COUNTER += 1
+        if is_file:
+             self.node_id = TreeNode.File_ID_COUNTER
+             TreeNode.File_ID_COUNTER += 1
+        else:
+            self.node_id = TreeNode.Folder_ID_COUNTER
+            TreeNode.Folder_ID_COUNTER += 1
+
+    def add_child(self, child_node):
+        child_node.parent = self
+        self.children.append(child_node)
+
+
+
 
 class AudioConverter:
     def __init__(self, **kwargs):
@@ -778,7 +822,6 @@ class AudioConverter:
             if not "artist" in data.keys():
                 continue
 
-
             data['folder_id'] = folder_id
             data['folder_short_name'] = folder_short_name
             data['mp3_filename'] = mp3_file
@@ -859,6 +902,155 @@ class AudioConverter:
         data["filepath"] = filepath
 
         return data
-    
-  
 
+
+    def walk_mp3_folders(self, root_folder:str) -> list:
+        all_data = []
+        folder_struct = {}
+        folder_struct[root_folder] = {}
+        for dirpath, dirnames, filenames in os.walk(root_folder):
+            print(f"Processing folder: {dirnames}")
+            for filename in filenames:
+                if filename.endswith('.mp3'):
+                    full_path = os.path.join(dirpath, filename)
+                    print(f"Probing file: {full_path}")
+                    # data = self.probe_mp3_file(full_path)
+                    # if data:
+                    #     all_data.append(data)
+        return all_data
+
+    def build_tree(self, path: Path, parent=None) -> TreeNode:
+        # Check if is_file, the file is an mp3 file
+        is_file = path.is_file() and path.suffix.lower() == '.mp3'
+        node = TreeNode(path.name, is_file=is_file, filepath=path, parent=parent)
+        if path.is_dir():
+            for child_path in sorted(path.iterdir(), key=lambda p: (p.is_file(), p.name)):
+                child_node = self.build_tree(child_path, parent=node)
+                node.add_child(child_node)
+        return node
+
+    def extract_tree(self, node: TreeNode) -> dict:
+        tree_list = {}
+        tree_list[node.node_id] = {
+            'name': node.name,            'is_file': node.is_file,
+            'parent_id': node.parent.node_id if node.parent else None,
+            'children_ids': [child.node_id for child in node.children],
+            'filepath': str(WindowsPath(node.filepath)),
+            'outputfilepath':f"{self.output_folder}/{node.node_id:08d}.ogg" if node.is_file else None
+        }
+        for child in node.children:
+            tree_list.update(self.extract_tree(child))
+        return tree_list
+
+    def print_tree(self, node: TreeNode, indent: str = ""):
+        print(indent + ("📄 " if node.is_file else "📁 ") + node.name + "("+ (str(node.node_id) + ":" + str(node.parent.node_id) if node.parent else "root") +")")
+        for child in node.children:
+            self.print_tree(child, indent + "    ")
+
+    def print_tree_with_counts(self, node: TreeNode, indent: str = ""):
+        # Print current node with file/folder icon
+        print(indent + ("📄 " if node.is_file else "📁 ") + node.name)
+
+        # Initialize counts for this subtree
+        folder_count = 0
+        file_count = 0
+
+        # Current node counts as folder if not a file
+        if node.is_file:
+            file_count += 1
+        else:
+            folder_count += 1
+
+        # Recurse into children and aggregate counts
+        for child in node.children:
+            child_folders, child_files = self.print_tree_with_counts(child, indent + "    ")
+            folder_count += child_folders
+            file_count += child_files
+
+        return folder_count, file_count
+
+    def prepare_files_for_conversion(self, root_folder: str):
+        path = Path(root_folder)
+        root_node = self.build_tree(path)
+        tree_list = {}
+
+        print("Extracting tree structure to CSV format...")
+        tree_list = self.extract_tree(root_node)
+        files = []
+        folders = []    
+        #print(f"{item['name']} (ID: {node_id}, Parent ID: {item['parent_id']}: {'File' if item['is_file'] else 'Folder'})")
+        for node_id, item in tree_list.items():
+            if node_id == 1:
+                print(f"Root folder: {item['name']} (ID: {node_id}) {item['is_file']}")
+            if item['is_file']:
+                #row = f"{node_id}|{item['name']}| {item['parent_id']}"
+                row = self.make_row_dict(node_id, item)
+                files.append(row)
+            else:
+                row = f"{node_id}|{item['name']}| {item['parent_id']}|0|0|0|0|1|null"
+                folders.append(row)
+
+        #self.write_files("folders.csv", folders)
+
+        # save files as a JSON file
+        with open("files.json", "w", encoding="utf-8") as f:
+            json.dump(files, f, ensure_ascii=False, indent=4)
+
+        print("Finished extracting tree structure to JSON format.")
+        print(f"Total Folders: {len(folders)}")
+        print(f"Total Files: {len(files)}")
+
+        #self.print_tree(root_node)
+        # folders, files = self.print_tree_with_counts(root_node)
+        # print(f"Folders: {folders}")
+        # print(f"Files: {files}")
+
+    def convert_prepared_files(self, json_file: str):
+        if not os.path.exists(json_file):
+            print(f"File not found: {json_file}")
+            return
+
+        with open(json_file, "r", encoding="utf-8") as f:
+            files = json.load(f)
+
+        print(f"Converting {len(files)} files...")
+
+        for file in files:
+            input_file = file['filepath']
+            node_id = file['node_id']
+            output_file = f"{self.output_folder}/{str(node_id).zfill(8)}.ogg"
+
+            if not os.path.exists(input_file):
+                print(f"Input file not found: {input_file} ... skipping")
+                continue
+
+            if self.keep_converted:
+                if os.path.exists(output_file):
+                    print(f"Output file already exists: {output_file}  ... skipping")
+                    continue
+
+            print(f"Converting: {input_file} => {output_file}")
+
+            try:
+                os.system(f"ffmpeg -y -i \"{input_file}\" -nostats -loglevel 0 -c:a libvorbis -q:a 4 -vsync 2 \"{output_file}\"")
+                print(f"Converted: {input_file} => {output_file}")
+            except:
+                print(f"Failed to convert: {input_file} => {output_file}")
+                continue
+
+        print("File conversion done.")
+        
+    def make_row_dict(self, node_id: int, item: dict) -> dict:
+        row = {}
+        row['node_id'] = node_id
+        row['name'] = item['name']
+        row['parent_id'] = item['parent_id']
+        row['filepath'] = item.get('filepath','')
+        row['outputfilepath'] = item.get('outputfilepath','')
+        return row
+
+        # Step 1: Walk through the directory and build the tree structure
+    def write_files(self, filename: str, lines: list):
+        with open(filename, "w", encoding="utf-8") as f:
+            for line in lines:
+                f.write(line + "\n")
