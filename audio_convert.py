@@ -106,7 +106,7 @@ class AudioConverter:
             return {}
 
         # Read artists from a file with the following format : id, name
-        with open(file, "r") as f:
+        with open(file, "r", encoding='utf-8') as f:
             data = f.read().split("\n")
             artists = {}
             for line in data:
@@ -1030,8 +1030,6 @@ class AudioConverter:
         insert_statements = []
         failed_conversions = []
         for index, file in enumerate(files):
-            if index == 100:
-                break
             input_file = file['filepath']
             node_id = file['node_id']
             output_file = f"{self.output_folder}/{str(node_id).zfill(8)}.ogg"
