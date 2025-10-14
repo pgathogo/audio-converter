@@ -43,6 +43,7 @@ if __name__ == "__main__":
     parser.add_argument("--r", action="store_true", help="Rename audio files")
     parser.add_argument("--m", action="store_true", help="Read MP3 folder")
     parser.add_argument("--w", action="store_true", help="Walks through MP3 folders")
+    parser.add_argument("--t", action="store_true", help="Convert prepared files")
     args = parser.parse_args()
 
     if args.c:
@@ -55,6 +56,8 @@ if __name__ == "__main__":
         audio_converter.convert_mp3_to_ogg()
     elif args.w:
         audio_converter.prepare_files_for_conversion(audio_converter.chamgei_music_folder)
+    elif args.t:
+        audio_converter.convert_prepared_files()
     else:
         parser.print_help()
         print('\n')

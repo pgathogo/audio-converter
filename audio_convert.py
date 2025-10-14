@@ -91,6 +91,7 @@ class AudioConverter:
         self.total_conversion_time_str = ""
         self.total_zero_bytes_files = 0
 
+
     def _make_mssql_connection(self):
         reg = read_registry()
         server = reg['server']
@@ -932,7 +933,8 @@ class AudioConverter:
     def extract_tree(self, node: TreeNode) -> dict:
         tree_list = {}
         tree_list[node.node_id] = {
-            'name': node.name,            'is_file': node.is_file,
+            'name': node.name,
+            'is_file': node.is_file,
             'parent_id': node.parent.node_id if node.parent else None,
             'children_ids': [child.node_id for child in node.children],
             'filepath': str(WindowsPath(node.filepath)),
@@ -987,7 +989,6 @@ class AudioConverter:
             if node_id == 1:
                 print(f"Root folder: {item['name']} (ID: {node_id}) {item['is_file']}")
             if item['is_file']:
-                #row = f"{node_id}|{item['name']}| {item['parent_id']}"
                 row = self.make_row_dict(node_id, item)
                 files.append(row)
             else:
@@ -995,6 +996,9 @@ class AudioConverter:
                 folders.append(row)
 
         #self.write_files("folders.csv", folders)
+
+        print(f"Length of artist data: {len(self.artists)}")
+        self.write_artists_to_file()
 
         # save files as a JSON file
         with open("files.json", "w", encoding="utf-8") as f:
@@ -1009,7 +1013,10 @@ class AudioConverter:
         # print(f"Folders: {folders}")
         # print(f"Files: {files}")
 
-    def convert_prepared_files(self, json_file: str):
+    def convert_prepared_files(self):
+        print("Converting prepared files...")
+
+        json_file = "files.json"
         if not os.path.exists(json_file):
             print(f"File not found: {json_file}")
             return
@@ -1019,7 +1026,11 @@ class AudioConverter:
 
         print(f"Converting {len(files)} files...")
 
-        for file in files:
+        insert_statements = []
+        failed_conversions = []
+        for index, file in enumerate(files):
+            if index == 100:
+                break
             input_file = file['filepath']
             node_id = file['node_id']
             output_file = f"{self.output_folder}/{str(node_id).zfill(8)}.ogg"
@@ -1033,24 +1044,109 @@ class AudioConverter:
                     print(f"Output file already exists: {output_file}  ... skipping")
                     continue
 
-            print(f"Converting: {input_file} => {output_file}")
+            print(f"{index}. Converting: {input_file} => {output_file}")
 
             try:
                 os.system(f"ffmpeg -y -i \"{input_file}\" -nostats -loglevel 0 -c:a libvorbis -q:a 4 -vsync 2 \"{output_file}\"")
                 print(f"Converted: {input_file} => {output_file}")
+                duration =  self.probe_audio_duration(output_file)
+                file['duration'] = int(duration * 1000)  # in milliseconds
+                file['physicalstorageused'] = self.get_file_size(output_file)
+                track_insert_stmt = self.make_insert_statement(file)
+                insert_statements.append(track_insert_stmt)
             except:
                 print(f"Failed to convert: {input_file} => {output_file}")
+                failed_conversions.append(file)
                 continue
 
+        print(f"Writing insert statements to file...{len(insert_statements)}")
+        self.write_stmts(insert_statements)
+
+        # Write failed conversions to a json file
+        print(f"Writing failed conversions to file...{len(failed_conversions)}")
+        if len(failed_conversions) > 0:
+            with open(f"{self.log_folder}/failed_conversions.json", "w", encoding="utf-8") as f:
+                json.dump(failed_conversions, f, ensure_ascii=False, indent=4)
+
         print("File conversion done.")
-        
+
+
+    def write_stmts(self, stmts: list):
+        filename = f"{self.log_folder}/tracks_insert_statements.sql"
+        try:
+            with open(filename, "w", encoding="utf-8") as f:
+                for stmt in stmts:
+                    try:
+                        f.write(stmt + "\n")
+                    except:
+                        print(f"*ERROR* : Writing to file {filename}")
+                        return False
+            return True
+        except:
+            print(f"*ERROR* : Creating file {filename}")
+            return False    
+
+
+    def make_insert_statement(self, file: dict) -> str:
+        ins_stmt = (f'Insert into Tracks (trackreference, tracktitle,artistsearch,filepath,class,duration,year,'
+                    f'fadein,fadeout,fadedelay,intro,extro,folderid,onstartevent,onstopevent,'
+                    f'disablenotify,physicalstorageused,trackmediatype,artistID_1, old_filename)'
+                    f' VALUES ( '
+                    f'{file["node_id"]},"{file["title"]}","{file["artist"]}","//AUDIO-SERVER", '
+                    f'"{file["class"]}",{file["duration"]},{file["year"]},{file["fadein"]},{file["fadeout"]},'
+                    f'{file["fadedelay"]},{file["intro"]},{file["extro"]},{file["folderid"]},'
+                    f'{file["onstartevent"]},{file["onstopevent"]},{file["disablenotify"]},'
+                    f'{file["physicalstorageused"]},"{file["trackmediatype"]}",{file["artistID_1"]}, {file["old_filename"]} );')
+        return ins_stmt
+
     def make_row_dict(self, node_id: int, item: dict) -> dict:
         row = {}
         row['node_id'] = node_id
         row['name'] = item['name']
+
+        # JACKSON  LELEI  CHEBWARENG  - TUGUKAB CHUMBEK.mp3
+        # Split the name into artist and title based on the "-" character. If there are multiple
+        # "-" characters, the last one separates the artist from the title.
+
+        if "-" in item['name']:
+            # Split by "-" and use the last part as title, the rest as artist
+            parts = item['name'].rsplit("-", 1)
+            if len(parts) == 2:
+                row['artist'] = parts[0].strip()
+                row['title'] = parts[1].strip().replace(".mp3", "")
+            else:
+                row['artist'] = parts[0].strip()
+                row['title'] = parts[0].strip().replace(".mp3", "")
+        else:
+            row['artist'] = "UNKNOWN"
+            row['title'] = item['name'].strip().replace(".mp3", "")
+
         row['parent_id'] = item['parent_id']
         row['filepath'] = item.get('filepath','')
         row['outputfilepath'] = item.get('outputfilepath','')
+        row['class'] = "SONG"
+        row['year'] = 2025
+        row['fadein'] = 0
+        row['fadeout'] = 0
+        row['fadedelay'] = 0
+        row['intro'] = 0
+        row['extro'] = 0
+        row['folderid'] = item['parent_id']
+        row['onstartevent'] = -1
+        row['onstopevent'] = -1
+        row['disablenotify'] = 0
+        row['physicalstorageused'] = 0
+        row['trackmediatype'] = "AUDIO"
+        row['old_filename'] = node_id
+        artist = row['artist']
+        if artist not in self.artists.keys():
+            artist_id = len(self.artists) + 1
+            self.artists[artist] = artist_id
+            row['artist_id'] = artist_id
+        else:
+            row['artist_id'] = self.artists[artist]
+
+        row['artistID_1'] = row['artist_id']
         return row
 
         # Step 1: Walk through the directory and build the tree structure
@@ -1058,3 +1154,9 @@ class AudioConverter:
         with open(filename, "w", encoding="utf-8") as f:
             for line in lines:
                 f.write(line + "\n")
+
+    def write_artists_to_file(self):
+        print(f"Writing artists data...{len(self.artists)}")
+        with open(f"{self.log_folder}/artists.txt", "w") as f:
+            for artist, id in self.artists.items():
+                f.write(f"{id}|{artist}\n")
