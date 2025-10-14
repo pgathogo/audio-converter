@@ -981,10 +981,11 @@ class AudioConverter:
         tree_list = {}
 
         print("Extracting tree structure to CSV format...")
+
         tree_list = self.extract_tree(root_node)
         files = []
         folders = []    
-        #print(f"{item['name']} (ID: {node_id}, Parent ID: {item['parent_id']}: {'File' if item['is_file'] else 'Folder'})")
+
         for node_id, item in tree_list.items():
             if node_id == 1:
                 print(f"Root folder: {item['name']} (ID: {node_id}) {item['is_file']}")
@@ -995,7 +996,7 @@ class AudioConverter:
                 row = f"{node_id}|{item['name']}| {item['parent_id']}|0|0|0|0|1|null"
                 folders.append(row)
 
-        #self.write_files("folders.csv", folders)
+        self.write_files("folders.csv", folders)
 
         print(f"Length of artist data: {len(self.artists)}")
         self.write_artists_to_file()
@@ -1159,4 +1160,8 @@ class AudioConverter:
         print(f"Writing artists data...{len(self.artists)}")
         with open(f"{self.log_folder}/artists.txt", "w") as f:
             for artist, id in self.artists.items():
-                f.write(f"{id}|{artist}\n")
+                try:
+                    f.write(f"{id}|{artist}\n")
+                except:
+                    print(f"*ERROR* : Writing artist: {artist} to file")
+                    continue
