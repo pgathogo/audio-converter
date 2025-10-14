@@ -54,7 +54,7 @@ if __name__ == "__main__":
     elif args.m:
         audio_converter.convert_mp3_to_ogg()
     elif args.w:
-        audio_converter.prepare_files_for_conversion("D:/CHAMLIVE")
+        audio_converter.prepare_files_for_conversion(audio_converter.chamgei_music_folder)
     else:
         parser.print_help()
         print('\n')

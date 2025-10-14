@@ -52,8 +52,6 @@ class TreeNode:
         self.children.append(child_node)
 
 
-
-
 class AudioConverter:
     def __init__(self, **kwargs):
         self.dbf_folder = kwargs.get("dbf_folder", "dbf/")
@@ -69,6 +67,7 @@ class AudioConverter:
         self.exclude_dbfs = kwargs.get("exclude_dbfs", "")
         self.sql_folder = kwargs.get("sql_folder", "sql/")
         self.include_folders = kwargs.get("include_folders", "")  # For mp3 folders
+        self.chamgei_music_folder = kwargs.get("chamgei_music_folder", "")
 
         converted = kwargs.get("keep_converted", "False")
         if converted == "True":
@@ -924,6 +923,7 @@ class AudioConverter:
         is_file = path.is_file() and path.suffix.lower() == '.mp3'
         node = TreeNode(path.name, is_file=is_file, filepath=path, parent=parent)
         if path.is_dir():
+            print(f"Reading folder: {path}")
             for child_path in sorted(path.iterdir(), key=lambda p: (p.is_file(), p.name)):
                 child_node = self.build_tree(child_path, parent=node)
                 node.add_child(child_node)
@@ -970,6 +970,10 @@ class AudioConverter:
         return folder_count, file_count
 
     def prepare_files_for_conversion(self, root_folder: str):
+        if root_folder == "":
+            print("Please provide a valid root folder.")
+            return
+
         path = Path(root_folder)
         root_node = self.build_tree(path)
         tree_list = {}
