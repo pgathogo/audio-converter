@@ -1158,7 +1158,7 @@ class AudioConverter:
 
     def write_artists_to_file(self):
         print(f"Writing artists data...{len(self.artists)}")
-        with open(f"{self.log_folder}/artists.txt", "w") as f:
+        with open(f"{self.log_folder}/artists.txt", "w", encoding="utf-8") as f:
             for artist, id in self.artists.items():
                 try:
                     f.write(f"{id}|{artist}\n")
