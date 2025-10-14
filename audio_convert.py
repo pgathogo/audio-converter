@@ -125,7 +125,7 @@ class AudioConverter:
             return {}
 
         # Read artists from a file with the following format : id, name
-        with open(file, "r") as f:
+        with open(file, "r", encoding='utf-8') as f:
             records = f.read().split("\n")
             data = {}
             for record in records:
