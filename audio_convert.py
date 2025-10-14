@@ -920,7 +920,9 @@ class AudioConverter:
         return all_data
 
     def build_tree(self, path: Path, parent=None) -> TreeNode:
-        node = TreeNode(path.name, is_file=path.is_file(), filepath=path, parent=parent)
+        # Check if is_file, the file is an mp3 file
+        is_file = path.is_file() and path.suffix.lower() == '.mp3'
+        node = TreeNode(path.name, is_file=is_file, filepath=path, parent=parent)
         if path.is_dir():
             for child_path in sorted(path.iterdir(), key=lambda p: (p.is_file(), p.name)):
                 child_node = self.build_tree(child_path, parent=node)
@@ -967,47 +969,88 @@ class AudioConverter:
 
         return folder_count, file_count
 
+    def prepare_files_for_conversion(self, root_folder: str):
+        path = Path(root_folder)
+        root_node = self.build_tree(path)
+        tree_list = {}
 
-    # def build_tree(self, start_path):
-    #     """
-    #     Traverses a directory and builds a tree of Node objects.
-    #     """
-    #     # Create the root node for the starting directory
-    #     root_name = os.path.basename(os.path.abspath(start_path))
-    #     root_node = Node(root_name)
-    #     root_node.path = os.path.abspath(start_path)
+        print("Extracting tree structure to CSV format...")
+        tree_list = self.extract_tree(root_node)
+        files = []
+        folders = []    
+        #print(f"{item['name']} (ID: {node_id}, Parent ID: {item['parent_id']}: {'File' if item['is_file'] else 'Folder'})")
+        for node_id, item in tree_list.items():
+            if node_id == 1:
+                print(f"Root folder: {item['name']} (ID: {node_id}) {item['is_file']}")
+            if item['is_file']:
+                #row = f"{node_id}|{item['name']}| {item['parent_id']}"
+                row = self.make_row_dict(node_id, item)
+                files.append(row)
+            else:
+                row = f"{node_id}|{item['name']}| {item['parent_id']}|0|0|0|0|1|null"
+                folders.append(row)
 
-    #     # Dictionary to keep track of created nodes by their path
-    #     nodes_by_path = {root_node.path: root_node}
+        #self.write_files("folders.csv", folders)
 
-    #     print(nodes_by_path)
+        # save files as a JSON file
+        with open("files.json", "w", encoding="utf-8") as f:
+            json.dump(files, f, ensure_ascii=False, indent=4)
 
-    #     for dirpath, dirnames, filenames in os.walk(start_path):
-    #         current_node = nodes_by_path[dirpath]
+        print("Finished extracting tree structure to JSON format.")
+        print(f"Total Folders: {len(folders)}")
+        print(f"Total Files: {len(files)}")
 
-    #         # Add subdirectories as child nodes
-    #         for dirname in dirnames:
-    #             dir_node = Node(dirname, parent=current_node, is_file=False)
-    #             dir_node.path = os.path.join(dirpath, dirname)
-    #             current_node.add_child(dir_node)
-    #             nodes_by_path[dir_node.path] = dir_node
+        #self.print_tree(root_node)
+        # folders, files = self.print_tree_with_counts(root_node)
+        # print(f"Folders: {folders}")
+        # print(f"Files: {files}")
 
-    #         # Add files as child nodes
-    #         for filename in filenames:
-    #             file_node = Node(filename, parent=current_node, is_file=True)
-    #             file_node.path = os.path.join(dirpath, filename)
-    #             current_node.add_child(file_node)
+    def convert_prepared_files(self, json_file: str):
+        if not os.path.exists(json_file):
+            print(f"File not found: {json_file}")
+            return
 
-    #     return root_node
+        with open(json_file, "r", encoding="utf-8") as f:
+            files = json.load(f)
 
-    # def print_tree(self, node, indent=0):
-    #     """
-    #     A helper function to visualize the tree structure.
-    #     """
-    #     prefix = "└── " if indent > 0 else ""
-    #     print(" " * indent * 4 + prefix + node.name)
+        print(f"Converting {len(files)} files...")
+
+        for file in files:
+            input_file = file['filepath']
+            node_id = file['node_id']
+            output_file = f"{self.output_folder}/{str(node_id).zfill(8)}.ogg"
+
+            if not os.path.exists(input_file):
+                print(f"Input file not found: {input_file} ... skipping")
+                continue
+
+            if self.keep_converted:
+                if os.path.exists(output_file):
+                    print(f"Output file already exists: {output_file}  ... skipping")
+                    continue
+
+            print(f"Converting: {input_file} => {output_file}")
+
+            try:
+                os.system(f"ffmpeg -y -i \"{input_file}\" -nostats -loglevel 0 -c:a libvorbis -q:a 4 -vsync 2 \"{output_file}\"")
+                print(f"Converted: {input_file} => {output_file}")
+            except:
+                print(f"Failed to convert: {input_file} => {output_file}")
+                continue
+
+        print("File conversion done.")
         
-    #     # Sort children to ensure consistent output
-    #     for child_name in sorted(node.children.keys()):
-    #         self.print_tree(node.children[child_name], indent + 1)
+    def make_row_dict(self, node_id: int, item: dict) -> dict:
+        row = {}
+        row['node_id'] = node_id
+        row['name'] = item['name']
+        row['parent_id'] = item['parent_id']
+        row['filepath'] = item.get('filepath','')
+        row['outputfilepath'] = item.get('outputfilepath','')
+        return row
 
+        # Step 1: Walk through the directory and build the tree structure
+    def write_files(self, filename: str, lines: list):
+        with open(filename, "w", encoding="utf-8") as f:
+            for line in lines:
+                f.write(line + "\n")

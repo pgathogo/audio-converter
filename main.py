@@ -54,40 +54,7 @@ if __name__ == "__main__":
     elif args.m:
         audio_converter.convert_mp3_to_ogg()
     elif args.w:
-        # audio_converter.walk_mp3_folders("D:/CHAMLIVE")
-        p = Path("D:/CHAMLIVE")
-        root_node = audio_converter.build_tree(p)
-        tree_list = {}
-
-        print("Extracting tree structure to CSV format...")
-        tree_list = audio_converter.extract_tree(root_node)
-        files = []
-        folders = []    
-        #print(f"{item['name']} (ID: {node_id}, Parent ID: {item['parent_id']}: {'File' if item['is_file'] else 'Folder'})")
-        for node_id, item in tree_list.items():
-            if node_id == 1:
-                print(f"Root folder: {item['name']} (ID: {node_id}) {item['is_file']}")
-            if item['is_file']:
-                #row = f"{node_id}|{item['name']}| {item['parent_id']}"
-                row = make_row_dict(node_id, item)
-                files.append(row)
-            else:
-                row = f"{node_id}|{item['name']}| {item['parent_id']}|0|0|0|0|1|null"
-                folders.append(row)
-
-        #write_files("folders.csv", folders)
-        # save files as a JSON file
-        with open("files.json", "w", encoding="utf-8") as f:
-            json.dump(files, f, ensure_ascii=False, indent=4)
-
-        print("Finished extracting tree structure to JSON format.")
-        print(f"Total Folders: {len(folders)}")
-        print(f"Total Files: {len(files)}")
-
-        #audio_converter.print_tree(root_node)
-        # folders, files = audio_converter.print_tree_with_counts(root_node)
-        # print(f"Folders: {folders}")
-        # print(f"Files: {files}")
+        audio_converter.prepare_files_for_conversion("D:/CHAMLIVE")
     else:
         parser.print_help()
         print('\n')
