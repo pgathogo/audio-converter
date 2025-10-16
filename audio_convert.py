@@ -1026,6 +1026,8 @@ class AudioConverter:
             files = json.load(f)
 
         print(f"Converting {len(files)} files...")
+        start_time = datetime.datetime.now()
+        print(f"Start Time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
         insert_statements = []
         failed_conversions = []
@@ -1068,6 +1070,10 @@ class AudioConverter:
                 json.dump(failed_conversions, f, ensure_ascii=False, indent=4)
 
         print("File conversion done.")
+        end_time = datetime.datetime.now()
+        print(f"End Time: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        time_diff = end_time - start_time
+        print(f"Total Conversion Time: {time_diff}")
 
 
     def write_stmts(self, stmts: list):
