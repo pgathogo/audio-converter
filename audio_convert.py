@@ -920,14 +920,21 @@ class AudioConverter:
         return all_data
 
     def build_tree(self, path: Path, parent=None) -> TreeNode:
-        # Check if is_file, the file is an mp3 file
-        is_file = path.is_file() and path.suffix.lower() == '.mp3'
+        # Only include folders and .mp3 files
+        if path.is_file():
+            if path.suffix.lower() != '.mp3':
+                return None
+            is_file = True
+        else:
+            is_file = False
+
         node = TreeNode(path.name, is_file=is_file, filepath=path, parent=parent)
         if path.is_dir():
             print(f"Reading folder: {path}")
             for child_path in sorted(path.iterdir(), key=lambda p: (p.is_file(), p.name)):
                 child_node = self.build_tree(child_path, parent=node)
-                node.add_child(child_node)
+                if child_node is not None:
+                    node.add_child(child_node)
         return node
 
     def extract_tree(self, node: TreeNode) -> dict:
