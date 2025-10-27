@@ -235,7 +235,7 @@ class AudioConverter:
         tracks = self.fetch_data(self.tracks_export_file)
         for old_name, id in tracks.items():
             new_name = f"{str(id).zfill(8)}.ogg"
-            print(f"Old name: {old_name}  New name: {new_name}")
+            print(f"Old name: {old_name} =>  New name: {new_name}")
             try:
                 os.rename(f"{self.output_folder}/{old_name}", f"{self.converted_files_folder}/{new_name}")
             except:
@@ -273,7 +273,7 @@ class AudioConverter:
                 continue
 
             print(f"Reading data from.......: {dbf}")
-            data = get_data(self.dbf_folder+"/"+dbf)
+            data = get_data(self.dbf_folder,dbf, self.audio_folder)
 
             if len(data) == 0:
                 continue
@@ -312,7 +312,8 @@ class AudioConverter:
         for i, record in enumerate(data):
             # Get .MTS file count in the audio folder
 
-            input_file = f"{self.audio_folder}/{dbf}/{record['audio_file']}"
+            #input_file = f"{self.audio_folder}/{dbf}/{record['audio_file']}"
+            input_file = record['audio_file']
 
             # Check if audio file exists
             if not os.path.exists(f"{input_file}"):
@@ -341,8 +342,8 @@ class AudioConverter:
             if not os.path.exists(self.output_folder):
                 os.makedirs(self.output_folder)
 
-            output_file = f"{dbf}{record['code']}.ogg"
-            output_filepath = f"{self.output_folder}/{output_file}"
+            output_file = f"{record['category']}{record['code']}.ogg"
+            output_filepath = f"{self.output_folder}//{output_file}"
 
             if self.keep_converted:
                 if os.path.exists(output_filepath):
@@ -494,7 +495,7 @@ class AudioConverter:
         print(f"Total conversion time.........: {self.total_conversion_time_str}")
 
     def write_data(self, data: list, dbf: str):
-        # Write data to a json file, remoce extension .DBF
+        # Write data to a json file, remove extension .DBF
         dbf = dbf[:-4]
         print(f"Writing data to: {self.dbf_folder}/{dbf}.json")
         with open(f"{self.dbf_folder}/{dbf}.json", "w") as f:

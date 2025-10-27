@@ -29,10 +29,12 @@ def get_raw_dbf_data(dbf: str) -> list:
 
     return data
 
-def format_raw_data(hex_data: list, dbf_name: str) -> list:
+def format_raw_data(hex_data: list, category: str, audio_folder: str) -> list:
     # Remove "DBF/" and .DBF from dbf name
-    dbf_name = dbf_name[8:-4]
-    category = dbf_name
+    # dbf_name = dbf_name[8:-4]
+    # Remove the .DBF from  category ABC.DBF -> ABC
+
+    category = category[:-4]
 
     ascii_data = []
     for i, data in enumerate(hex_data):
@@ -60,14 +62,13 @@ def format_raw_data(hex_data: list, dbf_name: str) -> list:
         if record['code'] == '':
             continue
 
-        record['audio_file'] = f"{dbf_name}{record['code']}.MTS"
-
+        record['audio_file'] = f"{audio_folder}//{category}//{category}{record['code']}.MTS"
 
         ascii_data.append(record)
 
     return ascii_data
 
-def get_data(dbf: str)-> list:
-    raw_data = get_raw_dbf_data(dbf)
-    data = format_raw_data(raw_data, dbf)
+def get_data(dbf_folder : str, category: str, audio_folder: str)-> list:
+    raw_data = get_raw_dbf_data(dbf_folder+"/"+category)
+    data = format_raw_data(raw_data, category, audio_folder)
     return data
