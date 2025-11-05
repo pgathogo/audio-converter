@@ -572,7 +572,7 @@ class AudioConverter:
         # Write data to a csv file
         filename = f"{self.log_folder}/audio_files_list.csv"
         print(f"Writing audio files list to: {filename}")
-        with open(filename, "w") as f:
+        with open(filename, "w", encoding='utf-8') as f:
             # Write header
             f.write("unique_id,song_id,path,title,artist,album,genre,lyrics,isrc,playlist,length,amplify,fade_in,fade_out,cue_in,cue_out,cross_start_next\n")
             for track in trcks:
