@@ -538,6 +538,10 @@ class AudioConverter:
             ogg_filepath = f"{filepath}{ogg_filename}"
 
             # Generate hash of track_reference + track_title + artist_search
+            if track_title is None:
+                continue
+            if artist_search is None:
+                continue
             unique_id = hashlib.sha256(str(track_reference).encode() + track_title.encode()).hexdigest()[0:24]
 
             # Create hash of ogg_filepath
