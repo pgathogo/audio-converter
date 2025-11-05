@@ -44,6 +44,7 @@ if __name__ == "__main__":
     parser.add_argument("--m", action="store_true", help="Read MP3 folder")
     parser.add_argument("--w", action="store_true", help="Walks through MP3 folders")
     parser.add_argument("--t", action="store_true", help="Convert prepared files")
+    parser.add_argument("--l", action="store_true", help="List audio files")
     args = parser.parse_args()
 
     if args.c:
@@ -58,6 +59,8 @@ if __name__ == "__main__":
         audio_converter.prepare_files_for_conversion(audio_converter.chamgei_music_folder)
     elif args.t:
         audio_converter.convert_prepared_files()
+    elif args.l:
+        audio_converter.list_audio_files()
     else:
         parser.print_help()
         print('\n')

@@ -1,4 +1,5 @@
 import os
+import hashlib
 import json
 from timeit import default_timer as timer
 import datetime
@@ -166,7 +167,7 @@ class AudioConverter:
             track = {}
             track['tracktitle'] = record['title']
             track['artistsearch'] = record['artist']
-            track['filepath'] = "//AUDIO-SERVER/AUDIO/"   # Find out the correct path
+            track['filepath'] = "//AUDIO-SERVER/"   # Find out the correct path
             track['class'] = 'SONG'
             track['duration'] = record['duration_ms']
             track['year'] = 2020
@@ -500,6 +501,85 @@ class AudioConverter:
         print(f"Writing data to: {self.dbf_folder}/{dbf}.json")
         with open(f"{self.dbf_folder}/{dbf}.json", "w") as f:
             json.dump(data, f, indent=4)
+
+
+    def list_audio_files(self):
+        # Read data from the audio database
+        print("Listing audio files from database")
+
+        if not self.mssql_con.connect():
+            print("Failed to connect to database")
+            return
+
+        sql = (f'select Tracks.filepath, Tracks.TrackReference, Tracks.TrackTitle, '
+              f' Tracks.ArtistSearch, Tree.NodeName, Tracks.Duration '
+              f' from Tracks, Tree '
+              f'Where tracks.FolderID = Tree.NodeID '
+              f'order by TrackReference ')
+
+        cursor = self.mssql_con.conn.cursor()
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+
+        trcks = []
+
+        for index, row in enumerate(rows):
+            track =  {}
+
+            print(f"Processing record {index+1} / {len(rows)}", end="\r")
+
+            filepath = row[0]
+            track_reference = row[1]
+            track_title = row[2]
+            artist_search = row[3]
+            node_name = row[4]
+            duration = row[5]
+            ogg_filename = f"{str(track_reference).zfill(8)}.ogg"
+            ogg_filepath = f"{filepath}{ogg_filename}"
+
+            # Generate hash of track_reference + track_title + artist_search
+            unique_id = hashlib.sha256(str(track_reference).encode() + track_title.encode()).hexdigest()[0:24]
+
+            # Create hash of ogg_filepath
+            song_id = hashlib.sha256(ogg_filename.encode()).hexdigest()[0:32]
+
+            track["unique_id"] = unique_id
+            track["song_id"] = song_id
+            track["path"] = ogg_filepath
+            track["title"] = track_title
+            track["artist"] = artist_search
+            track["album"] = ""
+            track["genre"] = node_name
+            track["lyrics"] = ""
+            track["isrc"] = ""
+            track["playlist"] = "default"
+            track["length"] = duration
+            track["amplify"] = ""
+            track["fade_in"] = ""
+            track["fade_out"] = ""
+            track["cue_in"] = ""
+            track["cue_out"] = ""
+            track["cross_start_next"] = ""
+
+            trcks.append(track)
+
+        self.mssql_con.disconnect()
+
+        # Write data to a csv file
+        filename = f"{self.log_folder}/audio_files_list.csv"
+        print(f"Writing audio files list to: {filename}")
+        with open(filename, "w") as f:
+            # Write header
+            f.write("unique_id,song_id,path,title,artist,album,genre,lyrics,isrc,playlist,length,amplify,fade_in,fade_out,cue_in,cue_out,cross_start_next\n")
+            for track in trcks:
+                f.write(f"{track['unique_id']},{track['song_id']},"
+                f"{track['path']},{track['title']},{track['artist']},"
+                f"{track['album']},{track['genre']},{track['lyrics']},"
+                f"{track['isrc']},{track['playlist']},{track['length']},"
+                f"{track['amplify']},{track['fade_in']},{track['fade_out']},"
+                f"{track['cue_in']},{track['cue_out']},{track['cross_start_next']}\n")
+            
+        print("Audio files listing done.")
 
     def convert_mp3_to_ogg(self):
         if not os.path.exists("ffmpeg.exe"):
