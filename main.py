@@ -32,12 +32,7 @@ def make_row_dict(node_id: int, item: dict) -> dict:
     return row
 
 if __name__ == "__main__":
-    config_ini = "config.ini"
-    config = get_config(config_ini)
-    audio_converter = AudioConverter(**config)
-
     parser = argparse.ArgumentParser(description="Convert and rename audio files")
-
     parser.add_argument("--c", action="store_true", help="Convert audio files")
     parser.add_argument("--p", action="store_true", help="process converted files")
     parser.add_argument("--r", action="store_true", help="Rename audio files")
@@ -45,7 +40,18 @@ if __name__ == "__main__":
     parser.add_argument("--w", action="store_true", help="Walks through MP3 folders")
     parser.add_argument("--t", action="store_true", help="Convert prepared files")
     parser.add_argument("--l", action="store_true", help="List audio files")
+
+    parser.add_argument("--config" , type=str, help="Path to config file", default="config.ini")
     args = parser.parse_args()
+
+    config_ini = args.config
+    print(f"Using config file: {config_ini}")
+    if not Path(config_ini).is_file():
+        print(f"Config file {config_ini} does not exist.")
+        exit(1)
+
+    config = get_config(args.config)
+    audio_converter = AudioConverter(**config)
 
     if args.c:
         audio_converter.convert()
@@ -65,4 +71,3 @@ if __name__ == "__main__":
         parser.print_help()
         print('\n')
         print("Please provide an argument")
-
