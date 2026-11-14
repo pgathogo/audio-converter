@@ -3,6 +3,7 @@
 *.ini
 *.json
 *.csv
+*.swp
 files.json
 folders.csv
 Audio/
