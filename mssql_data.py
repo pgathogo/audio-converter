@@ -3,7 +3,7 @@ import pyodbc
 
 def read_registry()->dict:
     access_reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
-    access_key = winreg.OpenKey(access_reg, "SOFTWARE\Proxima\StudioONE\Data")
+    access_key = winreg.OpenKey(access_reg, "SOFTWARE\\Proxima\\StudioONE\\Data")
     conn_str = winreg.QueryValueEx(access_key, "ConnectionString")
     tokens = conn_str[0].split(";")
     for tok in tokens:

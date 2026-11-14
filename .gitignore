@@ -1,9 +1,11 @@
 *~
 .*~
+.un~
 *.ini
 *.json
 *.csv
 *.swp
+.config*
 files.json
 folders.csv
 Audio/

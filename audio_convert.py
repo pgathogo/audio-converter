@@ -69,7 +69,7 @@ class AudioConverter:
         self.sql_folder = kwargs.get("sql_folder", "sql/")
         self.include_folders = kwargs.get("include_folders", "")  # For mp3 folders
         self.chamgei_music_folder = kwargs.get("chamgei_music_folder", "")
-
+        self.bahari_music_folder = kwargs.get("bahari_music_folder", "")
         converted = kwargs.get("keep_converted", "False")
         if converted == "True":
             self.keep_converted = True
