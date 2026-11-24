@@ -70,6 +70,8 @@ class AudioConverter:
         self.include_folders = kwargs.get("include_folders", "")  # For mp3 folders
         self.chamgei_music_folder = kwargs.get("chamgei_music_folder", "")
         self.bahari_music_folder = kwargs.get("bahari_music_folder", "")
+        self.sulwe_music_folder = kwargs.get("sulwe_music_folder", "")
+        self.tracks_log_folder = kwargs.get("tracks_log_folder", "tracks_log/")
         converted = kwargs.get("keep_converted", "False")
         if converted == "True":
             self.keep_converted = True
@@ -617,7 +619,7 @@ class AudioConverter:
 
             audio_folders[short_folder_name] = mp3_files
 
-        max_track_id = self.get_max_track_id()
+        max_track_id = 1   #self.get_max_track_id()
         print(f"Current Max Track ID....: {max_track_id}")
 
         counter = 0
@@ -1134,12 +1136,14 @@ class AudioConverter:
 
             if self.keep_converted:
                 if os.path.exists(output_file):
-                    print(f"Output file already exists: {output_file}  ... skipping")
+                    print(f"Output file {output_file} already exists ... skipping")
                     continue
 
             print(f"{index}. Converting: {input_file} => {output_file}")
 
             try:
+                # Convert the file using ffmpeg and retunr the duration of the converted file in milliseconds
+                print(f"Converting: {input_file} => {output_file}")
                 os.system(f"ffmpeg -y -i \"{input_file}\" -nostats -loglevel 0 -c:a libvorbis -q:a 4 -vsync 2 \"{output_file}\"")
                 print(f"Converted: {input_file} => {output_file}")
                 duration =  self.probe_audio_duration(output_file)
@@ -1147,16 +1151,24 @@ class AudioConverter:
                 file['physicalstorageused'] = self.get_file_size(output_file)
                 track_insert_stmt = self.make_insert_statement(file)
                 insert_statements.append(track_insert_stmt)
+
+                # Create another temporary insert statment list so that after every 10 conversions we write to another insert statments log file
+                if len(insert_statements) % 10 == 0:
+                    temp_insert_stmts = insert_statements[-10:]
+                    temp_filename = f"{self.tracks_log_folder}/tracks_insert_statements_{index}_{len(insert_statements)}.sql"
+                    print(f"Writing {len(temp_insert_stmts)} insert statements to file {temp_filename}...")
+                    self.write_stmts(temp_insert_stmts, temp_filename)
+
             except:
                 print(f"Failed to convert: {input_file} => {output_file}")
                 failed_conversions.append(file)
                 continue
 
-        print(f"Writing insert statements to file...{len(insert_statements)}")
-        self.write_stmts(insert_statements)
+        print(f"Writing {len(insert_statements)} insert statements to file {self.log_folder}/tracks_insert_statements.sql...")
+        self.write_stmts(insert_statements, f"{self.log_folder}/tracks_insert_statements.sql")
 
         # Write failed conversions to a json file
-        print(f"Writing failed conversions to file...{len(failed_conversions)}")
+        print(f"Writing {len(failed_conversions)} failed conversions to file {self.log_folder}/failed_conversions.json...")
         if len(failed_conversions) > 0:
             with open(f"{self.log_folder}/failed_conversions.json", "w", encoding="utf-8") as f:
                 json.dump(failed_conversions, f, ensure_ascii=False, indent=4)
@@ -1168,8 +1180,9 @@ class AudioConverter:
         print(f"Total Conversion Time: {time_diff}")
 
 
-    def write_stmts(self, stmts: list):
-        filename = f"{self.log_folder}/tracks_insert_statements.sql"
+    def write_stmts(self, stmts: list, filename: str = None) -> bool:
+        if filename is None:
+            filename = f"{self.log_folder}/tracks_insert_statements.sql"
         try:
             with open(filename, "w", encoding="utf-8") as f:
                 for stmt in stmts:

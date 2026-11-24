@@ -62,7 +62,7 @@ if __name__ == "__main__":
     elif args.m:
         audio_converter.convert_mp3_to_ogg()
     elif args.w:
-        audio_converter.prepare_files_for_conversion(audio_converter.bahari_music_folder)
+        audio_converter.prepare_files_for_conversion(audio_converter.sulwe_music_folder)
     elif args.t:
         audio_converter.convert_prepared_files()
     elif args.l:
